@@ -116,21 +116,70 @@ const Bohai = {
   }),
 
   getMapPoints: async (sampleSize) => safeQuery((() => {
+    const nearShoreCities = [
+      { lon: 117.7, lat: 39.0 },  // 天津
+      { lon: 118.2, lat: 39.6 },  // 唐山
+      { lon: 119.6, lat: 39.9 },  // 秦皇岛
+      { lon: 120.8, lat: 40.7 },  // 葫芦岛
+      { lon: 122.2, lat: 40.3 },  // 营口
+      { lon: 121.6, lat: 38.9 },  // 大连
+      { lon: 121.4, lat: 37.5 },  // 烟台
+      { lon: 122.1, lat: 37.5 },  // 威海
+      { lon: 118.7, lat: 37.5 },  // 东营
+      { lon: 117.9, lat: 37.4 },  // 滨州
+      { lon: 116.8, lat: 38.3 },  // 沧州
+    ];
     const zones = ['近岸', '过渡', '远海'];
     const classes = ['一类', '二类', '三类', '四类', '劣四类'];
+    const classWeights = [0.22, 0.28, 0.25, 0.16, 0.09];
     const points = [];
-    for (let i = 0; i < Math.min(sampleSize || 500, 500); i++) {
+    const count = Math.min(sampleSize || 600, 600);
+
+    function weightedClass() {
+      let r = Math.random();
+      let acc = 0;
+      for (let i = 0; i < classes.length; i++) {
+        acc += classWeights[i];
+        if (r <= acc) return classes[i];
+      }
+      return classes[0];
+    }
+
+    for (let i = 0; i < count; i++) {
       const zone = zones[Math.floor(Math.random() * 3)];
-      const baseLon = zone === '近岸' ? 121.2 : zone === '过渡' ? 121.8 : 122.5;
-      const baseLat = zone === '近岸' ? 38.8 : zone === '过渡' ? 39.0 : 39.2;
+      let lon, lat, offshoreKm;
+
+      if (zone === '近岸') {
+        const city = nearShoreCities[Math.floor(Math.random() * nearShoreCities.length)];
+        lon = city.lon + (Math.random() - 0.5) * 0.6;
+        lat = city.lat + (Math.random() - 0.5) * 0.5;
+        offshoreKm = 1 + Math.random() * 30;
+      } else if (zone === '过渡') {
+        lon = 117.8 + Math.random() * 4.5;
+        lat = 37.5 + Math.random() * 3.0;
+        offshoreKm = 30 + Math.random() * 70;
+      } else {
+        lon = 118.0 + Math.random() * 4.0;
+        lat = 37.8 + Math.random() * 2.5;
+        offshoreKm = 100 + Math.random() * 80;
+      }
+
+      const qc = weightedClass();
+      const multi = qc === '一类' ? 0.4 : qc === '二类' ? 0.65 : qc === '三类' ? 0.85 : qc === '四类' ? 1.1 : 1.4;
+
       points.push({
-        lon: +(baseLon + (Math.random() - 0.5) * 1.4).toFixed(4),
-        lat: +(baseLat + (Math.random() - 0.5) * 0.8).toFixed(4),
-        zone, quality_class: classes[Math.floor(Math.random() * 5)], year: 2018 + Math.floor(Math.random() * 7),
-        offshore_km: +(Math.random() * 180).toFixed(1), ph: +(7.6 + Math.random() * 0.7).toFixed(2),
-        dissolved_oxygen: +(5.5 + Math.random() * 3.0).toFixed(2), cod: +(0.5 + Math.random() * 4.0).toFixed(2),
-        inorganic_nitrogen: +(0.05 + Math.random() * 0.6).toFixed(4), active_phosphate: +(0.005 + Math.random() * 0.05).toFixed(4),
-        petroleum: +(0.01 + Math.random() * 0.09).toFixed(4)
+        lon: +lon.toFixed(4),
+        lat: +lat.toFixed(4),
+        zone,
+        quality_class: qc,
+        year: 2017 + Math.floor(Math.random() * 7),
+        offshore_km: +offshoreKm.toFixed(1),
+        ph: +(8.02 - multi * 0.18 + (Math.random() - 0.5) * 0.25).toFixed(2),
+        dissolved_oxygen: +(7.6 - multi * 1.2 + (Math.random() - 0.5) * 0.8).toFixed(2),
+        cod: +(0.45 + multi * 1.3 + (Math.random() - 0.5) * 0.5).toFixed(2),
+        inorganic_nitrogen: +(0.04 + multi * 0.15 + (Math.random() - 0.5) * 0.04).toFixed(4),
+        active_phosphate: +(0.004 + multi * 0.012 + (Math.random() - 0.5) * 0.003).toFixed(4),
+        petroleum: +(0.01 + multi * 0.022 + (Math.random() - 0.5) * 0.008).toFixed(4)
       });
     }
     return points;
