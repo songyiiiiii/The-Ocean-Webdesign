@@ -19,10 +19,10 @@ const pool = mysql.createPool({
   user: dbUser,
   password: dbPassword,
   database: dbName,
-  waitForConnections: true,
-  connectionLimit: 10,
+  waitForConnections: false,
+  connectionLimit: 3,
   queueLimit: 0,
-  connectTimeout: 60000,
+  connectTimeout: 5000,
   ssl: dbSsl ? { rejectUnauthorized: false } : undefined
 });
 

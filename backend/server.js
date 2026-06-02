@@ -145,11 +145,13 @@ setInterval(() => {
 }, 3000);
 
 // 检查告警规则
+let checkAlertsDbDown = false;
 async function checkAlerts(sensorData) {
   try {
     const [rules] = await db.query(
       'SELECT * FROM alert_rules WHERE is_active = 1'
     );
+    checkAlertsDbDown = false;
 
     for (const rule of rules) {
       let triggered = false;
@@ -216,7 +218,10 @@ async function checkAlerts(sensorData) {
       }
     }
   } catch (error) {
-    console.error('检查告警规则失败:', error);
+    if (!checkAlertsDbDown) {
+      console.warn('检查告警规则失败（已切换本地数据）:', error.message);
+      checkAlertsDbDown = true;
+    }
   }
 }
 
