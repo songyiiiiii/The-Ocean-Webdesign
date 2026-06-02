@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Profile - Ocean Guardian</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script>
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    if (typeof url === 'string' && url.includes('events.mapbox.com')) {
+      return new Promise(function(resolve) { resolve({ ok: false, status: 0, json: function(){ return Promise.resolve({}); }, text: function(){ return Promise.resolve(''); } }); });
+    }
+    return _origFetch.apply(this, arguments);
+  };
+  var _origSendBeacon = navigator.sendBeacon;
+  navigator.sendBeacon = function(url, data) {
+    if (typeof url === 'string' && url.includes('events.mapbox.com')) return true;
+    return _origSendBeacon.apply(navigator, arguments);
+  };
+  </script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="./app-config.js"></script>
+  <script src="./mapbox-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:#020a14}
+    ::-webkit-scrollbar-thumb{background:#0e7490;border-radius:3px}
+    body{background:#020a14;color:#cffafe;overflow-x:hidden;font-family:'Inter',sans-serif}
+
+    /* ===== 全局背景视频 ===== */
+    #global-video-bg{
+      position:fixed;top:0;left:0;width:100%;height:100vh;z-index:0;overflow:hidden;
+    }
+    #global-video-bg video{
+      width:100%;height:100%;object-fit:cover;display:block;
+      filter:saturate(0.3) brightness(0.98) contrast(1.02) blur(0.2px);
+    }
+    #global-video-bg .video-overlay{
+      position:absolute;top:0;left:0;width:100%;height:100%;
+      background:linear-gradient(135deg,rgba(255,255,255,0.08) 0%,rgba(200,230,255,0.04) 25%,rgba(150,200,220,0.03) 50%,rgba(255,255,255,0.06) 75%,rgba(100,150,180,0.05) 100%);
+      backdrop-filter:blur(1px) brightness(1.1);
+      -webkit-backdrop-filter:blur(1px) brightness(1.1);
+    }
+    #global-video-bg .bottom-gradient{
+      position:absolute;bottom:0;left:0;width:100%;height:200px;
+      background:linear-gradient(to top,rgba(2,10,20,0.75) 0%,transparent 100%);
+      pointer-events:none;
+    }
+
+    /* 玻璃水纹 */
+    .glass-ripple{
+      position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:16;
+      background:repeating-linear-gradient(0deg,transparent 0px,rgba(150,200,240,0.03) 2px,transparent 4px,rgba(100,180,220,0.02) 6px,transparent 8px);
+      animation:glassWave 12s ease-in-out infinite;
+    }
+    @keyframes glassWave{0%,100%{background-position:0 0}50%{background-position:0 10px}}
+
+    .page-content{position:relative;z-index:5}
+
+    .nav-glass{
+      background:linear-gradient(135deg,rgba(6,182,212,0.08),rgba(2,10,20,0.75));
+      backdrop-filter:blur(20px);
+      -webkit-backdrop-filter:blur(20px);
+      border:1px solid rgba(6,182,212,0.15);
+      box-shadow:0 4px 30px rgba(0,0,0,0.5);
+    }
+
+    .tactile-base{
+      background:linear-gradient(145deg,rgba(8,30,50,0.85),rgba(2,10,20,0.9));
+      border:1px solid rgba(6,182,212,0.12);
+      box-shadow:inset 0 1px 0 rgba(6,182,212,0.08),0 4px 20px rgba(0,0,0,0.4);
+      transition:all 0.3s ease;
+    }
+    .tactile-base:hover{
+      transform:translateY(-4px);
+      border-color:rgba(6,182,212,0.3);
+      box-shadow:inset 0 1px 0 rgba(6,182,212,0.12),0 8px 40px rgba(6,182,212,0.1);
+    }
+
+    .tactile-inset{
+      background:linear-gradient(145deg,rgba(2,10,20,0.7),rgba(8,30,50,0.4));
+      border:1px solid rgba(6,182,212,0.08);
+      box-shadow:inset 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .btn-physical-light{
+      background:linear-gradient(145deg,#06b6d4,#0891b2);
+      border:1px solid rgba(103,232,249,0.3);
+      box-shadow:0 4px 12px rgba(6,182,212,0.3),inset 0 1px 0 rgba(255,255,255,0.15);
+      color:#020a14;font-weight:600;transition:all 0.15s ease;cursor:pointer;
+    }
+    .btn-physical-light:hover{
+      background:linear-gradient(145deg,#22d3ee,#06b6d4);
+      box-shadow:0 6px 20px rgba(6,182,212,0.4),inset 0 1px 0 rgba(255,255,255,0.2);
+      transform:translateY(-1px);
+    }
+
+    .btn-physical-dark{
+      background:linear-gradient(145deg,rgba(8,30,50,0.9),rgba(2,10,20,0.95));
+      border:1px solid rgba(6,182,212,0.2);
+      box-shadow:0 4px 12px rgba(0,0,0,0.4),inset 0 1px 0 rgba(6,182,212,0.1);
+      transition:all 0.15s ease;cursor:pointer;
+    }
+    .btn-physical-dark:hover{
+      box-shadow:0 2px 8px rgba(0,0,0,0.4),inset 0 1px 0 rgba(6,182,212,0.15);
+      transform:translateY(1px);
+    }
+
+    .zh-note{font-size:0.75rem;color:rgba(6,182,212,0.35);margin-left:4px;font-weight:400}
+
+    .profile-avatar-large{
+      width:96px;height:96px;border-radius:50%;
+      box-shadow:0 0 30px rgba(6,182,212,0.3);
+      overflow:hidden;position:relative;cursor:pointer;margin:0 auto;
+    }
+    .profile-avatar-large img{width:100%;height:100%;object-fit:cover}
+    .profile-avatar-large .avatar-placeholder{
+      width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+      font-size:40px;font-weight:700;color:#fff;
+      background:linear-gradient(145deg,#06b6d4,#0891b2);
+    }
+    .profile-avatar-large .avatar-upload-hint{
+      position:absolute;bottom:0;left:0;right:0;
+      background:rgba(0,0,0,0.6);color:rgba(255,255,255,0.7);
+      font-size:10px;text-align:center;padding:4px 0;
+      opacity:0;transition:opacity 0.2s;
+    }
+    .profile-avatar-large:hover .avatar-upload-hint{opacity:1}
+
+    .modal-input{
+      width:100%;padding:12px 16px;
+      background:rgba(2,10,20,0.8);
+      border:1px solid rgba(6,182,212,0.15);
+      border-radius:12px;color:#cffafe;font-size:14px;outline:none;
+      transition:border-color 0.2s;
+    }
+    .modal-input:focus{border-color:rgba(6,182,212,0.5)}
+
+    .map-container{border-radius:16px;overflow:hidden;border:1px solid rgba(6,182,212,0.15)}
+
+    .location-pulse{animation:pulse-ring 2s cubic-bezier(0.25,0.46,0.45,0.94) infinite}
+    @keyframes pulse-ring{
+      0%{box-shadow:0 0 0 0 rgba(6,182,212,0.5)}
+      70%{box-shadow:0 0 0 15px rgba(6,182,212,0)}
+      100%{box-shadow:0 0 0 0 rgba(6,182,212,0)}
+    }
+
+    .toast{
+      position:fixed;bottom:24px;right:24px;z-index:9999;
+      background:linear-gradient(145deg,rgba(8,30,50,0.95),rgba(2,10,20,0.98));
+      border:1px solid rgba(6,182,212,0.2);
+      padding:12px 24px;border-radius:12px;font-size:14px;
+      opacity:0;transform:translateY(20px);transition:all 0.3s ease;
+      pointer-events:none;
+    }
+    .toast.show{opacity:1;transform:translateY(0)}
+    .toast.error{border-color:rgba(248,113,113,0.4);color:#fca5a5}
+  </style>
+</head>
+<body>
+
+<!-- ===== 全局背景视频 ===== -->
+<div id="global-video-bg">
+  <video loop playsinline autoplay muted id="global-video">
+    <source src="public/ocean-bg.mp4" type="video/mp4">
+  </video>
+  <div class="video-overlay"></div>
+  <div class="bottom-gradient"></div>
+</div>
+<div class="glass-ripple"></div>
+
+<!-- 页面内容 -->
+<div class="page-content">
+
+<!-- ===== 导航栏 ===== -->
+<nav class="nav-glass fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl flex items-center gap-6 w-[90%] max-w-5xl">
+  <a href="ocean-guardian.html" class="flex items-center gap-2">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <path d="M2 18c3-4 6-6 10-6s7 3 10 6c-3 4-6 6-10 6s-7-3-10-6z" stroke="#06b6d4" stroke-width="2" fill="rgba(6,182,212,0.15)"/>
+      <path d="M4 14c2-3 5-5 8-5s6 2 8 5" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+      <path d="M6 10c2-2 4-4 7-4s5 2 7 4" stroke="#67e8f9" stroke-width="1" fill="none"/>
+    </svg>
+    <span class="text-lg font-bold text-cyan-50">Ocean Guardian</span>
+  </a>
+  <div class="hidden md:flex items-center gap-6 text-sm text-cyan-200/70 flex-1 justify-center">
+    <a href="ocean-guardian.html" class="hover:text-cyan-300 transition-colors">Home <span class="zh-note">首页</span></a>
+    <a href="ocean-guardian-bohai.html" class="hover:text-cyan-300 transition-colors">渤海 <span class="zh-note">Bohai</span></a>
+    <a href="ocean-guardian-norway.html" class="hover:text-cyan-300 transition-colors">挪威 <span class="zh-note">Norway</span></a>
+    <a href="ocean-guardian-microplastics.html" class="hover:text-cyan-300 transition-colors">微塑料 <span class="zh-note">Microplastics</span></a>
+  </div>
+  <div class="flex items-center gap-3 ml-auto">
+    <a href="user-profile.html" class="flex items-center gap-2 opacity-80" id="nav-avatar-link">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-cyan-500/30 overflow-hidden" id="nav-avatar-container">
+        <span id="nav-avatar-text">U</span>
+      </div>
+    </a>
+    <button class="btn-physical-dark px-3 py-1.5 rounded-lg text-xs text-cyan-300" id="btn-logout-nav" type="button">退出</button>
+  </div>
+</nav>
+
+<!-- ===== 主内容区 ===== -->
+<main class="pt-28 pb-16 px-4">
+  <div class="max-w-7xl mx-auto">
+
+    <div class="text-center mb-10">
+      <h1 class="text-3xl md:text-4xl font-bold text-cyan-50">User Profile</h1>
+      <span class="zh-note text-base">用户主页</span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- ===== 左侧：用户信息卡片 ===== -->
+      <div class="lg:col-span-1 space-y-6">
+
+        <!-- 头像+基本信息 -->
+        <div class="tactile-base rounded-2xl p-6 text-center">
+          <div class="profile-avatar-large mb-4" id="profile-avatar-wrapper" title="点击上传头像">
+            <img id="profile-avatar-img" src="" alt="" style="display:none">
+            <div class="avatar-placeholder" id="profile-avatar-placeholder">U</div>
+            <div class="avatar-upload-hint">点击上传头像</div>
+            <input type="file" id="avatar-file-input" accept="image/*" style="display:none">
+          </div>
+          <h2 class="text-xl font-bold text-cyan-50" id="display-username">---</h2>
+          <p class="text-sm text-cyan-400/60 mt-1" id="display-email">---</p>
+          <p class="text-xs text-cyan-400/30 mt-2 flex items-center justify-center gap-1">
+            <iconify-icon icon="mdi:calendar" width="14"></iconify-icon>
+            <span id="display-joined">---</span>
+          </p>
+
+          <div class="mt-4 tactile-inset rounded-xl p-3">
+            <div class="flex items-center justify-between text-xs text-cyan-400/60">
+              <span class="flex items-center gap-1"><iconify-icon icon="mdi:map-marker" width="12"></iconify-icon> 位置信息</span>
+              <span class="text-cyan-400/40" id="location-updated">未设置</span>
+            </div>
+            <div class="mt-2 text-sm text-cyan-100" id="location-display">---</div>
+            <div class="mt-1 text-xs text-cyan-400/40" id="location-coords">---</div>
+          </div>
+
+          <button class="btn-physical-light w-full mt-4 py-2.5 rounded-xl text-sm" id="btn-edit-profile" type="button">
+            <iconify-icon icon="mdi:pencil" width="16" class="inline align-middle mr-1"></iconify-icon>
+            编辑用户名
+          </button>
+        </div>
+
+        <!-- 实时定位 -->
+        <div class="tactile-base rounded-2xl p-6">
+          <h3 class="text-sm font-semibold text-cyan-50 flex items-center gap-2 mb-4">
+            <iconify-icon icon="mdi:crosshairs-gps" width="18" class="text-emerald-400"></iconify-icon>
+            实时定位
+            <span class="zh-note">GPS Tracking</span>
+          </h3>
+          <div class="tactile-inset rounded-xl p-3 mb-4">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-cyan-400/60">定位状态</span>
+              <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400/60 border border-cyan-500/20" id="gps-status-badge">未启动</span>
+            </div>
+            <div class="mt-2 text-xs text-cyan-400/40 space-y-1">
+              <div class="flex justify-between"><span>纬度 Lat</span><span id="gps-lat">---</span></div>
+              <div class="flex justify-between"><span>经度 Lng</span><span id="gps-lng">---</span></div>
+              <div class="flex justify-between"><span>精度 Accuracy</span><span id="gps-accuracy">---</span></div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn-physical-light flex-1 py-2 rounded-xl text-sm" id="btn-gps-start" type="button">
+              <iconify-icon icon="mdi:play" width="16" class="inline align-middle"></iconify-icon> 开启定位
+            </button>
+            <button class="btn-physical-dark flex-1 py-2 rounded-xl text-sm text-cyan-200" id="btn-gps-stop" type="button">
+              <iconify-icon icon="mdi:stop" width="16" class="inline align-middle"></iconify-icon> 停止
+            </button>
+          </div>
+          <p class="text-xs text-cyan-400/30 mt-2" id="gps-message">点击"开启定位"获取实时位置</p>
+        </div>
+
+        <!-- 快捷操作 -->
+        <div class="tactile-base rounded-2xl p-6">
+          <h3 class="text-sm font-semibold text-cyan-50 flex items-center gap-2 mb-4">
+            <iconify-icon icon="mdi:cog" width="18" class="text-cyan-400"></iconify-icon>
+            快捷操作
+          </h3>
+          <div class="space-y-2">
+            <button class="btn-physical-dark w-full py-2.5 rounded-xl text-sm text-left px-4 text-cyan-200" id="btn-save-location" type="button">
+              <iconify-icon icon="mdi:content-save" width="16" class="inline align-middle mr-2"></iconify-icon>
+              保存当前位置
+            </button>
+            <a href="ocean-guardian.html" class="btn-physical-dark w-full py-2.5 rounded-xl text-sm text-left px-4 text-cyan-200 block">
+              <iconify-icon icon="mdi:arrow-left" width="16" class="inline align-middle mr-2"></iconify-icon>
+              返回首页
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 右侧：地图 + 周边污染 ===== -->
+      <div class="lg:col-span-2 space-y-6">
+
+        <!-- 地图 -->
+        <div class="tactile-base rounded-2xl p-6">
+          <h3 class="text-sm font-semibold text-cyan-50 flex items-center gap-2 mb-4">
+            <iconify-icon icon="mdi:map" width="18" class="text-cyan-400"></iconify-icon>
+            周边海域污染地图
+            <span class="zh-note">Pollution Map</span>
+          </h3>
+          <div class="map-container" id="pollution-map" style="height:400px;">
+            <div class="w-full h-full flex items-center justify-center text-cyan-400/30 text-sm" id="map-placeholder">
+              <div class="text-center">
+                <iconify-icon icon="mdi:map-search" width="40" class="mx-auto mb-2 opacity-30"></iconify-icon>
+                <p>开启定位后显示周边污染数据</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 周边污染数据 -->
+        <div class="tactile-base rounded-2xl p-6">
+          <h3 class="text-sm font-semibold text-cyan-50 flex items-center gap-2 mb-4">
+            <iconify-icon icon="mdi:water-alert" width="18" class="text-orange-400"></iconify-icon>
+            周边污染状况
+            <span class="zh-note">Nearby Pollution</span>
+            <span class="text-xs text-cyan-400/30 ml-auto" id="nearby-count"></span>
+          </h3>
+          <div class="space-y-4" id="nearby-pollution-list">
+            <div class="tactile-inset rounded-xl p-6 text-center text-cyan-400/30">
+              <iconify-icon icon="mdi:satellite-uplink" width="32" class="mx-auto mb-2 opacity-30"></iconify-icon>
+              <p class="text-sm">等待定位数据...</p>
+              <p class="text-xs mt-1">开启GPS后将自动查询周边海域污染状况</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 国内水质监测数据 -->
+        <div class="tactile-base rounded-2xl p-6" id="domestic-water-card" style="display:none;">
+          <h3 class="text-sm font-semibold text-cyan-50 flex items-center gap-2 mb-4">
+            <iconify-icon icon="mdi:beaker" width="18" class="text-teal-400"></iconify-icon>
+            国内水质监测
+            <span class="zh-note">Domestic Water Quality</span>
+            <span class="text-xs text-cyan-400/30 ml-auto" id="domestic-count"></span>
+          </h3>
+          <!-- 水质指标摘要 -->
+          <div class="tactile-inset rounded-xl p-4 mb-4" id="domestic-summary" style="display:none;">
+            <div class="grid grid-cols-3 gap-3 mb-3">
+              <div class="text-center">
+                <div class="text-lg font-bold text-amber-400" id="dom-avg-nh4">--</div>
+                <div class="text-xs text-cyan-400/40">NH4 铵盐 μmol/L</div>
+              </div>
+              <div class="text-center">
+                <div class="text-lg font-bold text-violet-400" id="dom-avg-no3">--</div>
+                <div class="text-xs text-cyan-400/40">NO3 硝酸盐 μmol/L</div>
+              </div>
+              <div class="text-center">
+                <div class="text-lg font-bold text-emerald-400" id="dom-avg-chla">--</div>
+                <div class="text-xs text-cyan-400/40">Chla 叶绿素 μg/L</div>
+              </div>
+            </div>
+            <!-- 污染等级分布条 -->
+            <div class="flex h-3 rounded-full overflow-hidden" id="dom-level-bar">
+              <div class="bg-green-500" id="dom-bar-low" style="width:0%"></div>
+              <div class="bg-yellow-500" id="dom-bar-med" style="width:0%"></div>
+              <div class="bg-orange-500" id="dom-bar-high" style="width:0%"></div>
+              <div class="bg-red-500" id="dom-bar-vhigh" style="width:0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-cyan-400/40 mt-1.5">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>低</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-yellow-500 inline-block"></span>中</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-orange-500 inline-block"></span>高</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>极高</span>
+            </div>
+          </div>
+          <div class="space-y-2 max-h-64 overflow-y-auto" id="domestic-points-list">
+            <div class="tactile-inset rounded-xl p-4 text-center text-cyan-400/30">
+              <p class="text-sm">等待国内水质数据...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+</div><!-- /.page-content -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var API_BASE_URL = window.API_BASE_URL || 'http://localhost:5000/api';
+  var authToken = localStorage.getItem('ocean_guardian_token');
+  var currentUser = JSON.parse(localStorage.getItem('ocean_guardian_user') || 'null');
+  var watchId = null;
+  var currentPosition = null;
+  var pollutionMap = null;
+  var mapMarkers = [];
+
+  // ===== Mapbox Token (与首页一致) =====
+  mapboxgl.accessToken = window.MAPBOX_ACCESS_TOKEN || '';
+
+  // ===== Toast =====
+  function showToast(msg, isError) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (isError ? ' error' : '');
+    setTimeout(function(){ t.classList.add('show'); }, 100);
+    setTimeout(function(){ t.classList.remove('show'); }, 3000);
+  }
+
+  // ===== API =====
+  async function apiRequest(endpoint, options) {
+    options = options || {};
+    var headers = {};
+    // 头像上传不设置 Content-Type (让浏览器自动加 boundary)
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+    if (options.headers) Object.assign(headers, options.headers);
+    var resp = await fetch(API_BASE_URL + endpoint, Object.assign({}, options, { headers: headers }));
+    var data = await resp.json();
+    if (!resp.ok) throw new Error(data.message || '请求失败');
+    return data;
+  }
+
+  // ===== 背景视频自动播放 =====
+  (function(){
+    var bgVideo = document.getElementById('global-video');
+    if (bgVideo) {
+      bgVideo.play().catch(function(){});
+      document.addEventListener('click', function(){ bgVideo.play().catch(function(){}); }, { once: true });
+    }
+  })();
+
+  // ===== 加载用户信息 =====
+  async function loadUserProfile() {
+    if (!currentUser || !authToken) {
+      window.location.href = 'ocean-guardian.html';
+      return;
+    }
+    try {
+      var user = await apiRequest('/auth/me');
+      currentUser = user;
+      localStorage.setItem('ocean_guardian_user', JSON.stringify(user));
+      renderUserInfo(user);
+    } catch (e) {
+      showToast('加载用户信息失败: ' + e.message, true);
+      if (e.message.indexOf('令牌') !== -1 || e.message.indexOf('认证') !== -1) {
+        localStorage.removeItem('ocean_guardian_token');
+        localStorage.removeItem('ocean_guardian_user');
+        setTimeout(function(){ window.location.href = 'ocean-guardian.html'; }, 2000);
+      }
+    }
+  }
+
+  function updateNavAvatar(user) {
+    var container = document.getElementById('nav-avatar-container');
+    var textEl = document.getElementById('nav-avatar-text');
+    if (user.avatar) {
+      var img = container.querySelector('img');
+      if (!img) {
+        img = document.createElement('img');
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+        container.appendChild(img);
+      }
+      img.src = user.avatar;
+      img.style.display = '';
+      if (textEl) textEl.style.display = 'none';
+    } else {
+      var img = container.querySelector('img');
+      if (img) img.style.display = 'none';
+      if (textEl) { textEl.style.display = ''; textEl.textContent = (user.username || 'U').charAt(0).toUpperCase(); }
+    }
+  }
+
+  function renderUserInfo(user) {
+    // 头像
+    var avatarImg = document.getElementById('profile-avatar-img');
+    var avatarPlaceholder = document.getElementById('profile-avatar-placeholder');
+    if (user.avatar) {
+      avatarImg.src = user.avatar;
+      avatarImg.style.display = '';
+      avatarPlaceholder.style.display = 'none';
+    } else {
+      avatarImg.style.display = 'none';
+      avatarPlaceholder.style.display = '';
+      avatarPlaceholder.textContent = (user.username || 'U').charAt(0).toUpperCase();
+    }
+
+    updateNavAvatar(user);
+
+    document.getElementById('display-username').textContent = user.username;
+    document.getElementById('display-email').textContent = user.email;
+    var joined = user.created_at ? new Date(user.created_at).toLocaleDateString('zh-CN') : '---';
+    document.getElementById('display-joined').textContent = '加入于 ' + joined;
+
+    if (user.location && user.location.region) {
+      document.getElementById('location-display').textContent = user.location.region;
+      var coords = user.location.coordinates;
+      document.getElementById('location-coords').textContent = coords ? coords.lat.toFixed(4) + ', ' + coords.lng.toFixed(4) : '---';
+      document.getElementById('location-updated').textContent =
+        user.location.updatedAt ? new Date(user.location.updatedAt).toLocaleString('zh-CN') : '已设置';
+    } else {
+      document.getElementById('location-display').textContent = '未设置位置';
+      document.getElementById('location-coords').textContent = '---';
+    }
+  }
+
+  // ===== 头像上传 =====
+  document.getElementById('profile-avatar-wrapper').addEventListener('click', function(){
+    document.getElementById('avatar-file-input').click();
+  });
+
+  document.getElementById('avatar-file-input').addEventListener('change', async function(){
+    var file = this.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('图片大小不能超过5MB', true);
+      return;
+    }
+
+    var formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+      var result = await apiRequest('/auth/avatar', { method: 'POST', body: formData });
+      // auth/me 返回的 user 对象
+      if (result.user) {
+        currentUser = result.user;
+        localStorage.setItem('ocean_guardian_user', JSON.stringify(currentUser));
+        renderUserInfo(currentUser);
+      }
+      showToast('头像更新成功!');
+    } catch (e) {
+      showToast('上传失败: ' + e.message, true);
+    }
+    // 清空以便重新选择同一文件
+    this.value = '';
+  });
+
+  // ===== 编辑用户名 =====
+  document.getElementById('btn-edit-profile').addEventListener('click', function(){
+    var newName = prompt('输入新用户名 (3-20个字符):', currentUser ? currentUser.username : '');
+    if (!newName || newName.length < 3 || newName.length > 20) {
+      if (newName) showToast('用户名长度应为3-20个字符', true);
+      return;
+    }
+    apiRequest('/auth/profile', { method: 'PUT', body: JSON.stringify({ username: newName }) })
+      .then(function(user){
+        currentUser = user;
+        localStorage.setItem('ocean_guardian_user', JSON.stringify(user));
+        renderUserInfo(user);
+        showToast('用户名更新成功!');
+      })
+      .catch(function(e){ showToast(e.message, true); });
+  });
+
+  // ===== 实时定位 =====
+  function updateGpsStatus(status, text) {
+    var badge = document.getElementById('gps-status-badge');
+    badge.textContent = text || status;
+    badge.className = 'text-xs px-2 py-0.5 rounded-full';
+    if (status === 'active') badge.className += ' bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+    else if (status === 'error') badge.className += ' bg-red-500/20 text-red-400 border border-red-500/30';
+    else badge.className += ' bg-cyan-500/10 text-cyan-400/60 border border-cyan-500/20';
+  }
+
+  document.getElementById('btn-gps-start').addEventListener('click', function(){
+    if (!navigator.geolocation) {
+      showToast('浏览器不支持地理定位', true);
+      return;
+    }
+
+    document.getElementById('gps-message').textContent = '正在获取位置...';
+    updateGpsStatus('active', '搜星中...');
+
+    navigator.geolocation.getCurrentPosition(function(pos){
+      currentPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      document.getElementById('gps-lat').textContent = pos.coords.latitude.toFixed(6);
+      document.getElementById('gps-lng').textContent = pos.coords.longitude.toFixed(6);
+      document.getElementById('gps-accuracy').textContent = Math.round(pos.coords.accuracy) + 'm';
+      document.getElementById('gps-message').textContent = '定位成功! (更新时间: ' + new Date().toLocaleTimeString() + ')';
+      updateGpsStatus('active', '已定位');
+
+      initMap(currentPosition);
+      loadNearbyPollution(currentPosition);
+      loadDomesticWaterQuality(currentPosition);
+    }, function(err){
+      document.getElementById('gps-message').textContent = '定位失败: ' + err.message;
+      updateGpsStatus('error', '失败');
+      showToast('定位失败: ' + err.message, true);
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    watchId = navigator.geolocation.watchPosition(function(pos){
+      currentPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      document.getElementById('gps-lat').textContent = pos.coords.latitude.toFixed(6);
+      document.getElementById('gps-lng').textContent = pos.coords.longitude.toFixed(6);
+      document.getElementById('gps-accuracy').textContent = Math.round(pos.coords.accuracy) + 'm';
+      document.getElementById('gps-message').textContent = '实时追踪中... (更新时间: ' + new Date().toLocaleTimeString() + ')';
+      updateGpsStatus('active', '追踪中');
+
+      if (pollutionMap) {
+        // 更新地图用户标记
+        pollutionMap.flyTo({ center: [currentPosition.lng, currentPosition.lat], zoom: pollutionMap.getZoom() });
+      }
+    }, function(err){
+      console.log('Watch error:', err);
+    }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 5000 });
+  });
+
+  document.getElementById('btn-gps-stop').addEventListener('click', function(){
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+    document.getElementById('gps-message').textContent = '定位已停止';
+    updateGpsStatus('stopped', '已停止');
+  });
+
+  // ===== 保存位置 =====
+  document.getElementById('btn-save-location').addEventListener('click', function(){
+    if (!currentPosition) {
+      showToast('请先开启定位获取位置', true);
+      return;
+    }
+    var region = prompt('输入当前海域名称 (如: 渤海, 东海, 南海...):', '附近海域');
+    if (!region) return;
+
+    apiRequest('/auth/location', {
+      method: 'PUT',
+      body: JSON.stringify({ region: region, lat: currentPosition.lat, lng: currentPosition.lng })
+    }).then(function(user){
+      currentUser = user;
+      localStorage.setItem('ocean_guardian_user', JSON.stringify(user));
+      renderUserInfo(user);
+      showToast('位置已保存: ' + region);
+    }).catch(function(e){ showToast(e.message, true); });
+  });
+
+  // ===== Mapbox 地图 =====
+  function initMap(position) {
+    var container = document.getElementById('pollution-map');
+    var placeholder = document.getElementById('map-placeholder');
+    if (placeholder) placeholder.style.display = 'none';
+
+    if (!pollutionMap) {
+      pollutionMap = new mapboxgl.Map({
+        container: 'pollution-map',
+        style: 'mapbox://styles/mapbox/dark-v11',
+        projection: 'globe',
+        center: [position.lng, position.lat],
+        zoom: 6,
+        attributionControl: false
+      });
+
+      pollutionMap.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: true, visualizePitch: true }), 'bottom-right');
+
+      pollutionMap.on('style.load', function() {
+        try { pollutionMap.setPaintProperty('water', 'fill-color', '#021e3a'); } catch(e) {}
+        try { pollutionMap.setPaintProperty('water', 'fill-outline-color', '#053a5e'); } catch(e) {}
+      });
+
+      pollutionMap.on('load', function(){
+        pollutionMap.setFog({
+          'color': '#020a14',
+          'high-color': '#021d35',
+          'horizon-blend': 0.12,
+          'space-color': '#010a16',
+          'star-intensity': 0.7
+        });
+        addUserMarker(position);
+      });
+    } else {
+      pollutionMap.flyTo({ center: [position.lng, position.lat], zoom: 6 });
+    }
+  }
+
+  function addUserMarker(position) {
+    var el = document.createElement('div');
+    el.className = 'location-pulse';
+    el.style.cssText = 'width:16px;height:16px;background:#06b6d4;border-radius:50%;border:3px solid #fff;';
+
+    var marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([position.lng, position.lat])
+      .addTo(pollutionMap);
+    mapMarkers.push(marker);
+  }
+
+  function clearMapMarkers() {
+    mapMarkers.forEach(function(m){ m.remove(); });
+    mapMarkers = [];
+  }
+
+  // ===== 加载周边污染数据 =====
+  async function loadNearbyPollution(position) {
+    var listEl = document.getElementById('nearby-pollution-list');
+    listEl.innerHTML = '<div class="tactile-inset rounded-xl p-4 text-center text-cyan-400/30"><iconify-icon icon="mdi:loading" width="24" class="animate-spin mx-auto mb-2"></iconify-icon><p class="text-sm">查询周边污染数据...</p></div>';
+
+    try {
+      var data = await apiRequest('/pollution/nearby?lat=' + position.lat + '&lng=' + position.lng + '&radius=8000');
+      document.getElementById('nearby-count').textContent = '共 ' + data.nearby_count + ' 个区域';
+
+      if (!data.regions || data.regions.length === 0) {
+        listEl.innerHTML = '<div class="tactile-inset rounded-xl p-6 text-center text-cyan-400/30"><iconify-icon icon="mdi:map-marker-off" width="32" class="mx-auto mb-2 opacity-30"></iconify-icon><p class="text-sm">附近暂无污染监测数据</p></div>';
+        return;
+      }
+
+      // 添加污染标记到地图
+      if (pollutionMap) {
+        clearMapMarkers();
+        addUserMarker(position);
+
+        data.regions.forEach(function(region){
+          var color = region.pollutionIndex > 70 ? '#f87171' : region.pollutionIndex > 40 ? '#fbbf24' : '#34d399';
+          var el = document.createElement('div');
+          el.style.cssText = 'width:14px;height:14px;background:' + color + ';border-radius:50%;border:2px solid rgba(255,255,255,0.6);box-shadow:0 0 10px ' + color + ';';
+
+          var popup = new mapboxgl.Popup({ offset: 14 })
+            .setHTML('<div style="color:#cffafe;font-size:12px"><strong>' + region.region + '</strong><br/>污染指数: ' + region.pollutionIndex + '/100<br/>距离: ' + region.distance + 'km</div>');
+
+          var marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([Number(region.lng), Number(region.lat)])
+            .setPopup(popup)
+            .addTo(pollutionMap);
+          mapMarkers.push(marker);
+        });
+
+        var bounds = new mapboxgl.LngLatBounds();
+        bounds.extend([position.lng, position.lat]);
+        data.regions.forEach(function(r){ bounds.extend([Number(r.lng), Number(r.lat)]); });
+        pollutionMap.fitBounds(bounds, { padding: 60, maxZoom: 10 });
+      }
+
+      // 渲染列表
+      listEl.innerHTML = data.regions.map(function(region){
+        var levelColor = region.pollutionIndex > 70 ? 'text-red-400' : region.pollutionIndex > 40 ? 'text-yellow-400' : 'text-emerald-400';
+        var levelBg = region.pollutionIndex > 70 ? 'border-red-500/20' : region.pollutionIndex > 40 ? 'border-yellow-500/20' : 'border-emerald-500/20';
+        return '<div class="tactile-inset rounded-xl p-4 border ' + levelBg + '">' +
+          '<div class="flex items-center justify-between mb-2">' +
+            '<h4 class="text-sm font-semibold text-cyan-50">' + region.region + '</h4>' +
+            '<span class="text-xs ' + levelColor + ' font-bold">' + region.pollutionIndex + '/100</span>' +
+          '</div>' +
+          '<div class="flex items-center gap-4 text-xs text-cyan-400/50">' +
+            '<span>微塑料: ' + region.microplasticLevel + '</span>' +
+            '<span>化学: ' + region.chemicalLevel + '</span>' +
+            '<span>距离: ' + region.distance + 'km</span>' +
+          '</div>' +
+          (region.affectedSpecies && region.affectedSpecies.length ? '<div class="mt-2 text-xs text-cyan-400/30">受影响物种: ' + region.affectedSpecies.join('、') + '</div>' : '') +
+        '</div>';
+      }).join('');
+    } catch (e) {
+      listEl.innerHTML = '<div class="tactile-inset rounded-xl p-6 text-center"><p class="text-sm text-red-400/60">加载失败: ' + e.message + '</p></div>';
+      showToast('加载污染数据失败', true);
+    }
+  }
+
+  // ===== 加载国内水质监测数据 =====
+  async function loadDomesticWaterQuality(position) {
+    var card = document.getElementById('domestic-water-card');
+    var listEl = document.getElementById('domestic-points-list');
+    var summaryEl = document.getElementById('domestic-summary');
+
+    if (card) card.style.display = '';
+    listEl.innerHTML = '<div class="tactile-inset rounded-xl p-4 text-center text-cyan-400/30"><iconify-icon icon="mdi:loading" width="20" class="animate-spin mx-auto mb-1"></iconify-icon><p class="text-xs">查询国内水质数据...</p></div>';
+
+    try {
+      var data = await apiRequest('/domestic/nearby?lat=' + position.lat + '&lng=' + position.lng + '&radius=5');
+      document.getElementById('domestic-count').textContent = '共 ' + data.total + ' 个采样点';
+
+      if (!data.points || data.points.length === 0) {
+        listEl.innerHTML = '<div class="tactile-inset rounded-xl p-4 text-center text-cyan-400/30"><p class="text-xs">附近暂无国内水质监测数据</p></div>';
+        summaryEl.style.display = 'none';
+        return;
+      }
+
+      // 更新摘要
+      if (data.summary) {
+        summaryEl.style.display = '';
+        var s = data.summary;
+        document.getElementById('dom-avg-nh4').textContent = s.avg_nh4 !== null ? s.avg_nh4.toFixed(3) : '--';
+        document.getElementById('dom-avg-no3').textContent = s.avg_no3 !== null ? s.avg_no3.toFixed(1) : '--';
+        document.getElementById('dom-avg-chla').textContent = s.avg_chla !== null ? s.avg_chla.toFixed(3) : '--';
+
+        var total = s.total_points || 1;
+        document.getElementById('dom-bar-low').style.width = ((s.pollution_distribution['Low'] || 0) / total * 100) + '%';
+        document.getElementById('dom-bar-med').style.width = ((s.pollution_distribution['Medium'] || 0) / total * 100) + '%';
+        document.getElementById('dom-bar-high').style.width = ((s.pollution_distribution['High'] || 0) / total * 100) + '%';
+        document.getElementById('dom-bar-vhigh').style.width = ((s.pollution_distribution['Very High'] || 0) / total * 100) + '%';
+      }
+
+      // 添加国内水质点到地图
+      if (pollutionMap) {
+        data.points.slice(0, 200).forEach(function(p){
+          var color = p.pollutionLevel === 'Very High' ? '#ef4444' :
+                      p.pollutionLevel === 'High' ? '#f97316' :
+                      p.pollutionLevel === 'Medium' ? '#eab308' : '#22c55e';
+          var el = document.createElement('div');
+          el.style.cssText = 'width:6px;height:6px;background:' + color + ';border-radius:1px;opacity:0.7;';
+
+          var popupHtml = '<div style="color:#cffafe;font-size:11px;line-height:1.4">' +
+            '<strong>' + (p.region || '未知海域') + '</strong><br/>' +
+            'NH4: ' + (p.nh4 !== null ? p.nh4.toFixed(2) : '--') + ' μmol/L<br/>' +
+            'NO3: ' + (p.no3 !== null ? p.no3.toFixed(1) : '--') + ' μmol/L<br/>' +
+            'Chla: ' + (p.chla !== null ? p.chla.toFixed(3) : '--') + ' μg/L<br/>' +
+            '深度: ' + (p.depth !== null ? p.depth.toFixed(1) : '--') + 'm | 距离: ' + p.distance + 'km<br/>' +
+            '污染等级: <span style="color:' + color + '">' + p.pollutionLevel + '</span>' +
+            '</div>';
+
+          var marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([Number(p.lon), Number(p.lat)])
+            .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(popupHtml))
+            .addTo(pollutionMap);
+          mapMarkers.push(marker);
+        });
+      }
+
+      // 渲染最近的点列表
+      var topPoints = data.points.slice(0, 10);
+      listEl.innerHTML = topPoints.map(function(p){
+        var levelColor = p.pollutionLevel === 'Very High' ? 'text-red-400' :
+                         p.pollutionLevel === 'High' ? 'text-orange-400' :
+                         p.pollutionLevel === 'Medium' ? 'text-yellow-400' : 'text-emerald-400';
+        return '<div class="tactile-inset rounded-lg p-3 flex items-center justify-between">' +
+          '<div class="flex-1 min-w-0">' +
+            '<div class="text-xs text-cyan-100 truncate">' + (p.region || '未知') + ' · ' + p.distance + 'km</div>' +
+            '<div class="text-xs text-cyan-400/40 mt-0.5">NH4 ' + (p.nh4 !== null ? p.nh4.toFixed(2) : '--') +
+              ' | NO3 ' + (p.no3 !== null ? p.no3.toFixed(1) : '--') +
+              ' | Chla ' + (p.chla !== null ? p.chla.toFixed(2) : '--') + '</div>' +
+          '</div>' +
+          '<span class="text-xs font-bold ' + levelColor + ' shrink-0 ml-2">' + p.pollutionLevel + '</span>' +
+        '</div>';
+      }).join('');
+    } catch (e) {
+      listEl.innerHTML = '<div class="tactile-inset rounded-xl p-4 text-center"><p class="text-xs text-red-400/60">加载失败: ' + e.message + '</p></div>';
+      console.error('Domestic water quality error:', e);
+    }
+  }
+
+  // ===== 退出登录 =====
+  document.getElementById('btn-logout-nav').addEventListener('click', function(){
+    if (confirm('确定退出登录？')) {
+      localStorage.removeItem('ocean_guardian_token');
+      localStorage.removeItem('ocean_guardian_user');
+      window.location.href = 'ocean-guardian.html';
+    }
+  });
+
+  // ===== 初始化 =====
+  if (!authToken || !currentUser) {
+    window.location.href = 'ocean-guardian.html';
+  } else {
+    loadUserProfile();
+  }
+})();
+</script>
+</body>
+</html>

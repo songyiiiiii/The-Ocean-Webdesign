@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>渤海污染监测 - Ocean Guardian</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script>
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    if (typeof url === 'string' && url.includes('events.mapbox.com')) {
+      return new Promise(function(resolve) { resolve({ ok: false, status: 0, json: function(){ return Promise.resolve({}); }, text: function(){ return Promise.resolve(''); } }); });
+    }
+    return _origFetch.apply(this, arguments);
+  };
+  var _origSendBeacon = navigator.sendBeacon;
+  navigator.sendBeacon = function(url, data) {
+    if (typeof url === 'string' && url.includes('events.mapbox.com')) return true;
+    return _origSendBeacon.apply(navigator, arguments);
+  };
+  </script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="./app-config.js"></script>
+  <script src="./mapbox-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:#020a14}
+    ::-webkit-scrollbar-thumb{background:#0e7490;border-radius:3px}
+    body{background:#020a14;color:#cffafe;overflow-x:hidden}
+
+    /* 视频背景 */
+    #global-video-bg{position:fixed;top:0;left:0;width:100%;height:100vh;z-index:0;overflow:hidden;opacity:0.55;transition:opacity 0.8s cubic-bezier(0.4,0,0.2,1)}
+    #global-video-bg video{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0}
+    #global-video-bg .video-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,rgba(0,10,30,0.7) 0%,rgba(2,15,35,0.6) 50%,rgba(0,5,20,0.7) 100%)}
+    #global-video-bg .bottom-gradient{position:absolute;bottom:0;left:0;width:100%;height:40%;background:linear-gradient(to top,rgba(2,10,20,1) 0%,transparent 100%);pointer-events:none}
+
+    .tactile-base{background:rgba(2,15,35,0.7);border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(12px)}
+    .tactile-inset{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.04)}
+    .zh-note{display:block;font-size:12px;color:rgba(207,250,254,0.35);margin-top:2px}
+    .stat-card{transition:all 0.3s}
+    .stat-card:hover{transform:translateY(-2px);border-color:rgba(6,182,212,0.3)}
+    .quality-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+    .ql-1{background:#22c55e} .ql-2{background:#3b82f6} .ql-3{background:#eab308} .ql-4{background:#f97316} .ql-5{background:#ef4444}
+    #bohai-map{opacity:0.78;transition:opacity 0.5s}
+  </style>
+</head>
+<body class="font-['Inter',sans-serif]">
+
+<!-- 动态视频背景 -->
+<div id="global-video-bg">
+  <video loop playsinline id="global-video" muted>
+    <source src="public/ocean-bg.mp4" type="video/mp4">
+  </video>
+  <div class="video-overlay"></div>
+  <div class="bottom-gradient"></div>
+</div>
+
+<div style="position:relative;z-index:1;">
+
+<!-- Header -->
+<header class="fixed top-0 left-0 right-0 z-50 tactile-base border-b border-white/5" style="backdrop-filter:blur(20px);">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <iconify-icon icon="mdi:shield-water" width="28" class="text-cyan-400"></iconify-icon>
+      <div>
+        <h1 class="text-lg font-bold text-cyan-50">渤海污染监测系统</h1>
+        <span class="text-xs text-cyan-400/40">Bohai Sea Pollution Monitor · 2017-2023</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 text-sm">
+      <a href="ocean-guardian.html" class="text-cyan-400/60 hover:text-cyan-300 transition-colors no-underline">&larr; 返回主页</a>
+      <span class="text-cyan-400/20">|</span>
+      <span class="text-cyan-400/40 text-xs">数据来源: 渤海海水水质30m栅格数据集</span>
+    </div>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="pt-16">
+
+  <!-- Hero Stats Bar -->
+  <section class="py-6 px-4 border-b border-white/5">
+    <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4" id="stats-bar">
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-cyan-400" id="stat-points">--</div><span class="text-xs text-cyan-400/50">监测数据点</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-emerald-400" id="stat-class1">--</div><span class="text-xs text-cyan-400/50">一类水质占比</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-amber-400" id="stat-ph">--</div><span class="text-xs text-cyan-400/50">平均pH值</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-red-400" id="stat-cod">--</div><span class="text-xs text-cyan-400/50">平均COD mg/L</span></div>
+    </div>
+  </section>
+
+  <!-- 3D Map -->
+  <section class="relative" style="height:65vh;">
+    <div id="bohai-map" style="width:100%;height:100%;"></div>
+    <!-- Map legend -->
+    <div class="absolute bottom-4 left-4 tactile-base rounded-xl p-4 text-xs z-10" style="background:rgba(2,10,20,0.85);">
+      <div class="font-semibold text-cyan-200 mb-2">水质类别 Water Quality</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot ql-1"></span>一类 Excellent</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot ql-2"></span>二类 Good</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot ql-3"></span>三类 Fair</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot ql-4"></span>四类 Poor</div>
+      <div class="flex items-center gap-2"><span class="quality-dot ql-5"></span>劣四类 Very Poor</div>
+    </div>
+    <!-- Zone toggle -->
+    <div class="absolute top-4 right-4 tactile-base rounded-xl p-3 z-10 flex gap-2 text-xs flex-wrap" style="background:rgba(2,10,20,0.85);">
+      <button class="zone-btn px-3 py-1.5 rounded-lg transition-all active" data-zone="all" style="background:rgba(6,182,212,0.2);border:1px solid rgba(6,182,212,0.3);color:#67e8f9;">全部</button>
+      <button class="zone-btn px-3 py-1.5 rounded-lg transition-all" data-zone="近岸" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(207,250,254,0.6);">近岸</button>
+      <button class="zone-btn px-3 py-1.5 rounded-lg transition-all" data-zone="过渡" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(207,250,254,0.6);">过渡</button>
+      <button class="zone-btn px-3 py-1.5 rounded-lg transition-all" data-zone="远海" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(207,250,254,0.6);">远海</button>
+      <span style="border-left:1px solid rgba(255,255,255,0.1);margin:0 2px;"></span>
+      <button class="heatmap-btn px-3 py-1.5 rounded-lg transition-all text-xs" id="btn-heatmap" style="background:transparent;border:1px solid rgba(239,68,68,0.2);color:rgba(239,68,68,0.7);">🔥 热力图</button>
+    </div>
+  </section>
+
+  <!-- Charts Grid -->
+  <section class="py-10 px-4">
+    <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-6">
+
+      <!-- Yearly Trends -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:chart-line" width="18" class="text-cyan-400"></iconify-icon>
+          年度水质变化趋势
+        </h3>
+        <span class="zh-note mb-4">2017-2023 各指标年度均值变化</span>
+        <div class="relative" style="height:320px;"><canvas id="chart-yearly"></canvas></div>
+      </div>
+
+      <!-- Zone Comparison -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:map-marker-radius" width="18" class="text-teal-400"></iconify-icon>
+          三大区域水质对比
+        </h3>
+        <span class="zh-note mb-4">近岸 / 过渡 / 远海 指标对比</span>
+        <div class="relative" style="height:320px;"><canvas id="chart-zone"></canvas></div>
+      </div>
+
+      <!-- Distance Gradient -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:waves-arrow-right" width="18" class="text-blue-400"></iconify-icon>
+          离岸距离污染梯度
+        </h3>
+        <span class="zh-note mb-4">各指标随离岸距离变化趋势 | 点击指标切换</span>
+        <div id="gradient-indicators" class="flex gap-2 mb-4 flex-wrap">
+          <button class="grad-btn px-3 py-1 rounded-lg text-xs transition-all active" data-ind="cod" style="background:rgba(6,182,212,0.2);border:1px solid rgba(6,182,212,0.3);color:#67e8f9;">COD</button>
+          <button class="grad-btn px-3 py-1 rounded-lg text-xs transition-all" data-ind="dissolved_oxygen" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(207,250,254,0.6);">溶解氧</button>
+          <button class="grad-btn px-3 py-1 rounded-lg text-xs transition-all" data-ind="inorganic_nitrogen" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(207,250,254,0.6);">无机氮</button>
+          <button class="grad-btn px-3 py-1 rounded-lg text-xs transition-all" data-ind="active_phosphate" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(207,250,254,0.6);">活性磷酸盐</button>
+          <button class="grad-btn px-3 py-1 rounded-lg text-xs transition-all" data-ind="petroleum" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(207,250,254,0.6);">石油类</button>
+          <button class="grad-btn px-3 py-1 rounded-lg text-xs transition-all" data-ind="ph" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(207,250,254,0.6);">pH值</button>
+        </div>
+        <div class="relative" style="height:280px;"><canvas id="chart-gradient"></canvas></div>
+      </div>
+
+      <!-- Quality Class Distribution -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:shield-check" width="18" class="text-green-400"></iconify-icon>
+          水质等级分布
+        </h3>
+        <span class="zh-note mb-4">各区域水质类别数量及占比</span>
+        <div class="relative" style="height:320px;"><canvas id="chart-quality"></canvas></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Monthly Heatmap -->
+  <section class="pb-10 px-4">
+    <div class="max-w-7xl mx-auto">
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:calendar-month" width="18" class="text-violet-400"></iconify-icon>
+          月度水质模式 · Monthly Pattern
+        </h3>
+        <span class="zh-note mb-4">各月份监测指标均值变化 (4-12月)</span>
+        <div class="relative" style="height:320px;"><canvas id="chart-monthly"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- City Summary Table -->
+  <section class="pb-16 px-4">
+    <div class="max-w-7xl mx-auto">
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-4 flex items-center gap-2">
+          <iconify-icon icon="mdi:city" width="18" class="text-amber-400"></iconify-icon>
+          沿海城市水质概览 · City Summary
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm" id="city-table">
+            <thead>
+              <tr class="text-cyan-400/50 text-left border-b border-white/5">
+                <th class="py-2 pr-4">城市</th><th class="py-2 pr-4">监测点</th><th class="py-2 pr-4">pH均值</th><th class="py-2 pr-4">COD均值</th><th class="py-2 pr-4">无机氮均值</th><th class="py-2 pr-4">石油类均值</th>
+              </tr>
+            </thead>
+            <tbody id="city-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 受影响物种 · Affected Species ===== -->
+  <section class="pb-10 px-4">
+    <div class="max-w-7xl mx-auto">
+      <div class="text-center mb-8">
+        <h2 class="text-2xl font-bold text-cyan-50 flex items-center justify-center gap-2">
+          <iconify-icon icon="mdi:fish" width="24" class="text-amber-400"></iconify-icon>
+          渤海受威胁物种
+        </h2>
+        <span class="zh-note">渤海污染对以下物种造成严重威胁，种群数量持续下降</span>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6">
+
+        <!-- 斑海豹 -->
+        <div class="tactile-base rounded-2xl overflow-hidden group">
+          <div class="h-52 overflow-hidden relative">
+            <img src="public/species/spotted_seal.jpg" alt="斑海豹 Spotted Seal" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            <div class="absolute bottom-3 left-4">
+              <span class="px-2 py-0.5 rounded text-xs bg-red-500/80 text-white">濒危 EN</span>
+            </div>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-cyan-50">斑海豹 <span class="text-xs text-cyan-400/40 font-normal ml-1">Spotted Seal</span></h3>
+            <p class="text-xs text-cyan-400/30 italic mt-0.5">Phoca largha</p>
+            <p class="text-sm text-cyan-200/60 mt-3 leading-relaxed">渤海唯一的鳍足类海洋哺乳动物，国家一级保护动物。每年冬季在辽东湾冰区繁殖，石油污染、塑料垃圾导致栖息地缩减，种群不足2000头。</p>
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              <span class="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">石油污染</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">栖息地丧失</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">塑料摄入</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 中国对虾 -->
+        <div class="tactile-base rounded-2xl overflow-hidden group">
+          <div class="h-52 overflow-hidden relative">
+            <img src="public/species/chinese_shrimp.jpg" alt="中国对虾 Chinese White Shrimp" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            <div class="absolute bottom-3 left-4">
+              <span class="px-2 py-0.5 rounded text-xs bg-amber-500/80 text-white">近危 VU</span>
+            </div>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-cyan-50">中国对虾 <span class="text-xs text-cyan-400/40 font-normal ml-1">Chinese White Shrimp</span></h3>
+            <p class="text-xs text-cyan-400/30 italic mt-0.5">Fenneropenaeus chinensis</p>
+            <p class="text-sm text-cyan-200/60 mt-3 leading-relaxed">渤海湾传统渔业支柱品种，曾是黄渤海最重要的经济虾类。水体富营养化、重金属污染导致产卵场退化，野生资源量下降90%以上。</p>
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">重金属污染</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">富营养化</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">过度捕捞</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 小黄鱼 -->
+        <div class="tactile-base rounded-2xl overflow-hidden group">
+          <div class="h-52 overflow-hidden relative">
+            <img src="public/species/yellow_croaker.jpg" alt="小黄鱼 Yellow Croaker" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            <div class="absolute bottom-3 left-4">
+              <span class="px-2 py-0.5 rounded text-xs bg-amber-500/80 text-white">衰退 DE</span>
+            </div>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-cyan-50">小黄鱼 <span class="text-xs text-cyan-400/40 font-normal ml-1">Yellow Croaker</span></h3>
+            <p class="text-xs text-cyan-400/30 italic mt-0.5">Larimichthys polyactis</p>
+            <p class="text-sm text-cyan-200/60 mt-3 leading-relaxed">渤海最重要的底层经济鱼类之一，曾是沿海渔民的主要渔获。海洋污染、赤潮频发导致幼鱼成活率骤降，资源量仅为历史高峰的5%。</p>
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              <span class="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">赤潮影响</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">水质恶化</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">微塑料摄入</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/5 py-8 text-center">
+    <p class="text-xs text-cyan-400/30">渤海海水水质30m栅格数据集 (2017-2023) · 中国《海水水质标准》(GB 3097-1997) · Ocean Guardian Monitoring System</p>
+  </footer>
+</main>
+
+<script>
+(function(){
+  const API = (window.API_BASE_URL || 'http://localhost:5000/api') + '/bohai';
+  mapboxgl.accessToken = window.MAPBOX_ACCESS_TOKEN || '';
+
+  // ===== 全局数据缓存 =====
+  let allPoints = [], mapPoints = [], overviewData = null, gradientData = {};
+
+  // ===== 水质颜色映射 =====
+  const qualityColors = {
+    '一类': '#22c55e', '二类': '#3b82f6', '三类': '#eab308', '四类': '#f97316', '劣四类': '#ef4444'
+  };
+  const qualityOrder = ['一类','二类','三类','四类','劣四类'];
+  const indColors = {cod:'#eab308',dissolved_oxygen:'#06b6d4',inorganic_nitrogen:'#f97316',active_phosphate:'#a855f7',petroleum:'#ef4444',ph:'#22c55e'};
+  const indLabels = {cod:'COD (mg/L)',dissolved_oxygen:'溶解氧 (mg/L)',inorganic_nitrogen:'无机氮 (mg/L)',active_phosphate:'活性磷酸盐 (mg/L)',petroleum:'石油类 (mg/L)',ph:'pH值'};
+
+  // ===== 3D Globe =====
+  const map = new mapboxgl.Map({
+    container: 'bohai-map',
+    style: 'mapbox://styles/mapbox/dark-v11',
+    center: [119.5, 38.5],
+    zoom: 5.5,
+    projection: 'globe',
+    attributionControl: false
+  });
+
+  map.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: true, visualizePitch: true }), 'bottom-right');
+
+  map.on('style.load', () => {
+    try { map.setPaintProperty('water', 'fill-color', '#021e3a'); } catch(e) {}
+    try { map.setPaintProperty('water', 'fill-outline-color', '#053a5e'); } catch(e) {}
+  });
+
+  map.on('load', () => {
+    map.setFog({color:'#020a14', 'high-color':'#021d35', 'horizon-blend':0.12, 'space-color':'#010a16', 'star-intensity':0.7});
+    map.addSource('bohai-points', {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+    // 热力图数据源
+    map.addSource('bohai-heat', {type:'geojson', data:{type:'FeatureCollection', features:[]}});
+    map.addLayer({
+      id:'bohai-heatmap', type:'heatmap', source:'bohai-heat',
+      layout:{visibility:'none'},
+      paint:{
+        'heatmap-radius':['interpolate',['linear'],['zoom'],4,12,7,40],
+        'heatmap-opacity':0.75,
+        'heatmap-color':['interpolate',['linear'],['heatmap-density'],0,'rgba(6,182,212,0)',0.15,'#22c55e',0.4,'#eab308',0.65,'#f97316',0.85,'#ef4444',1,'#7f1d1d']
+      }
+    });
+    map.addLayer({
+      id:'bohai-circles', type:'circle', source:'bohai-points',
+      paint:{'circle-radius':4, 'circle-opacity':0.85, 'circle-stroke-color':'#fff', 'circle-stroke-width':0.5,
+        'circle-color':['get','color']},
+      filter:['all']
+    });
+    loadData();
+  });
+
+  // 自动旋转
+  let rotateInterval = setInterval(() => {
+    if (!map.loaded()) return;
+    const c = map.getCenter();
+    map.easeTo({center:[c.lng + 0.08, c.lat], duration:2000, easing:t=>t});
+  }, 2200);
+
+  map.on('dragstart', () => clearInterval(rotateInterval));
+  map.on('mouseenter','bohai-circles', () => {map.getCanvas().style.cursor='pointer';});
+  map.on('mouseleave','bohai-circles', () => {map.getCanvas().style.cursor='';});
+  map.on('click','bohai-circles', (e) => {
+    const props = e.features[0].properties;
+    new mapboxgl.Popup({closeButton:false,className:'tactile-popup'})
+      .setLngLat(e.lngLat)
+      .setHTML(`<div style="color:#cffafe;font-size:12px;padding:4px;">
+        <strong>${props.quality_class}</strong><br>
+        pH: ${props.ph} | DO: ${props.do}<br>
+        COD: ${props.cod} | N: ${props.nitrogen}<br>
+        离岸: ${props.offshore}km | ${props.year}
+      </div>`)
+      .addTo(map);
+  });
+
+  // Zone filter buttons
+  document.querySelectorAll('.zone-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.zone-btn').forEach(b => {b.classList.remove('active');b.style.background='transparent';b.style.borderColor='rgba(255,255,255,0.1)';b.style.color='rgba(207,250,254,0.6)';});
+      btn.classList.add('active');btn.style.background='rgba(6,182,212,0.2)';btn.style.borderColor='rgba(6,182,212,0.3)';btn.style.color='#67e8f9';
+      const zone = btn.dataset.zone;
+      map.setFilter('bohai-circles', zone === 'all' ? ['all'] : ['==',['get','zone'],zone]);
+    });
+  });
+
+  // ===== 加载数据 =====
+  async function loadData() {
+    try {
+      const [overview, yearly, monthly, quality, cities, mapPts] = await Promise.all([
+        fetch(API+'/overview').then(r=>r.json()),
+        fetch(API+'/yearly').then(r=>r.json()),
+        fetch(API+'/monthly').then(r=>r.json()),
+        fetch(API+'/quality').then(r=>r.json()),
+        fetch(API+'/cities').then(r=>r.json()),
+        fetch(API+'/map-points?sample=600').then(r=>r.json())
+      ]);
+      overviewData = overview; mapPoints = mapPts;
+      updateStatsBar(overview);
+      renderMapPoints(mapPts);
+      renderYearlyChart(yearly);
+      renderZoneChart(overview.zone_stats);
+      renderMonthlyChart(monthly);
+      renderQualityChart(quality);
+      renderCityTable(cities);
+      // 初始加载COD梯度
+      const gradRes = await fetch(API+'/distance-gradient?indicator=cod').then(r=>r.json());
+      gradientData.cod = gradRes.data;
+      renderGradientChart('cod');
+    } catch(e){console.error('数据加载失败:',e);}
+  }
+
+  // ===== Stats Bar =====
+  function updateStatsBar(ov) {
+    document.getElementById('stat-points').textContent = ov.total_points.toLocaleString();
+    const c1 = ov.quality_distribution.find(q=>q.quality_class==='一类');
+    document.getElementById('stat-class1').textContent = (c1?c1.pct:0)+'%';
+    const allPh = ov.zone_stats.reduce((s,z)=>s+parseFloat(z.avg_ph)*z.points,0)/ov.total_points;
+    document.getElementById('stat-ph').textContent = allPh.toFixed(2);
+    const allCod = ov.zone_stats.reduce((s,z)=>s+parseFloat(z.avg_cod)*z.points,0)/ov.total_points;
+    document.getElementById('stat-cod').textContent = allCod.toFixed(2);
+  }
+
+  // ===== Map Points =====
+  function renderMapPoints(pts) {
+    const features = pts.map(p => ({
+      type:'Feature',
+      geometry:{type:'Point',coordinates:[parseFloat(p.lon),parseFloat(p.lat)]},
+      properties:{
+        color:qualityColors[p.quality_class]||'#888',
+        zone:p.zone, quality_class:p.quality_class,
+        ph:parseFloat(p.ph).toFixed(2),
+        do:parseFloat(p.dissolved_oxygen).toFixed(1),
+        cod:parseFloat(p.cod).toFixed(2),
+        nitrogen:parseFloat(p.inorganic_nitrogen).toFixed(4),
+        offshore:parseFloat(p.offshore_km).toFixed(1),
+        year:p.year,
+        // 热力值：COD+无机氮作为污染强度
+        heatVal:(parseFloat(p.cod)+parseFloat(p.inorganic_nitrogen)*10)
+      }
+    }));
+    map.getSource('bohai-points').setData({type:'FeatureCollection',features});
+    // 热力图数据：仅劣四类和四类
+    var heatFeatures = features.filter(function(f){return f.properties.quality_class==='劣四类'||f.properties.quality_class==='四类';});
+    map.getSource('bohai-heat').setData({type:'FeatureCollection',features:heatFeatures});
+  }
+
+  // 热力图开关
+  var heatmapOn = false;
+  document.getElementById('btn-heatmap').addEventListener('click',function(){
+    heatmapOn = !heatmapOn;
+    var btn = this;
+    map.setLayoutProperty('bohai-heatmap','visibility',heatmapOn?'visible':'none');
+    map.setLayoutProperty('bohai-circles','visibility',heatmapOn?'none':'visible');
+    if(heatmapOn){btn.style.background='rgba(239,68,68,0.2)';btn.style.borderColor='rgba(239,68,68,0.4)';btn.style.color='#fca5a5';btn.textContent='🔥 热力图 ON';}
+    else{btn.style.background='transparent';btn.style.borderColor='rgba(239,68,68,0.2)';btn.style.color='rgba(239,68,68,0.7)';btn.textContent='🔥 热力图';}
+  });
+
+  // ===== Charts =====
+  Chart.defaults.color = 'rgba(207,250,254,0.6)';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+  Chart.defaults.font.family = 'Inter, sans-serif';
+
+  function renderYearlyChart(data) {
+    new Chart(document.getElementById('chart-yearly'), {
+      type:'line',
+      data:{
+        labels:data.map(d=>d.year),
+        datasets:[
+          {label:'COD (mg/L)',data:data.map(d=>d.avg_cod),borderColor:'#eab308',backgroundColor:'rgba(234,179,8,0.1)',tension:0.4,fill:true},
+          {label:'溶解氧 (mg/L)',data:data.map(d=>d.avg_do),borderColor:'#06b6d4',backgroundColor:'rgba(6,182,212,0.1)',tension:0.4,fill:true},
+          {label:'无机氮 (mg/L)',data:data.map(d=>d.avg_nitrogen),borderColor:'#f97316',backgroundColor:'transparent',tension:0.4,fill:false,yAxisID:'y1'},
+          {label:'石油类 (mg/L)',data:data.map(d=>d.avg_petroleum),borderColor:'#ef4444',backgroundColor:'transparent',tension:0.4,fill:false,yAxisID:'y1'},
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{usePointStyle:true,pointStyle:'circle',padding:16,font:{size:10}}}},
+        scales:{
+          x:{grid:{color:'rgba(255,255,255,0.03)'}},
+          y:{title:{text:'COD / DO (mg/L)',display:true,font:{size:10}},grid:{color:'rgba(255,255,255,0.03)'},min:0},
+          y1:{position:'right',title:{text:'无机氮 / 石油类 (mg/L)',display:true,font:{size:10}},grid:{display:false},min:0}
+        }
+      }
+    });
+  }
+
+  function renderZoneChart(zones) {
+    new Chart(document.getElementById('chart-zone'), {
+      type:'bar',
+      data:{
+        labels:zones.map(z=>z.area),
+        datasets:[
+          {label:'COD (mg/L)',data:zones.map(z=>z.avg_cod),backgroundColor:'#eab30880',borderColor:'#eab308',borderWidth:1},
+          {label:'溶解氧 (mg/L)',data:zones.map(z=>z.avg_do),backgroundColor:'#06b6d480',borderColor:'#06b6d4',borderWidth:1},
+          {label:'无机氮 (mg/L)',data:zones.map(z=>z.avg_nitrogen),backgroundColor:'#f9731680',borderColor:'#f97316',borderWidth:1},
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{usePointStyle:true,pointStyle:'rect',padding:12,font:{size:10}}}},
+        scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.03)'},min:0}}
+      }
+    });
+  }
+
+  function renderMonthlyChart(data) {
+    new Chart(document.getElementById('chart-monthly'), {
+      type:'line',
+      data:{
+        labels:data.map(d=>d.month+'月'),
+        datasets:[
+          {label:'COD',data:data.map(d=>d.avg_cod),borderColor:'#eab308',tension:0.4,pointRadius:4},
+          {label:'溶解氧',data:data.map(d=>d.avg_do),borderColor:'#06b6d4',tension:0.4,pointRadius:4},
+          {label:'无机氮',data:data.map(d=>d.avg_nitrogen),borderColor:'#f97316',tension:0.4,pointRadius:4,yAxisID:'y1'},
+          {label:'石油类',data:data.map(d=>d.avg_petroleum),borderColor:'#ef4444',tension:0.4,pointRadius:4,yAxisID:'y1'},
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{usePointStyle:true,pointStyle:'circle',padding:14,font:{size:10}}}},
+        scales:{
+          x:{grid:{color:'rgba(255,255,255,0.03)'}},
+          y:{title:{text:'COD / DO (mg/L)',display:true,font:{size:10}},grid:{color:'rgba(255,255,255,0.03)'},min:0},
+          y1:{position:'right',title:{text:'无机氮 / 石油类 (mg/L)',display:true,font:{size:10}},grid:{display:false},min:0}
+        }
+      }
+    });
+  }
+
+  function renderQualityChart(data) {
+    const zones = ['近岸','过渡','远海'];
+    const datasets = qualityOrder.map((qc,i) => ({
+      label:qc, data:zones.map(z=>{const d=data.find(r=>r.zone===z&&r.quality_class===qc);return d?d.pct:0;}),
+      backgroundColor:qualityColors[qc], borderColor:qualityColors[qc], borderWidth:0
+    }));
+    new Chart(document.getElementById('chart-quality'), {
+      type:'bar',
+      data:{labels:zones,datasets},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        indexAxis:'y',
+        plugins:{legend:{labels:{usePointStyle:true,pointStyle:'circle',padding:10,font:{size:10}},position:'bottom'}},
+        scales:{x:{stacked:true,title:{text:'占比 %',display:true,font:{size:10}},grid:{color:'rgba(255,255,255,0.03)'},max:100},y:{stacked:true,grid:{display:false}}}
+      }
+    });
+  }
+
+  let gradientChart = null;
+  function renderGradientChart(indicator) {
+    const data = gradientData[indicator];
+    if (!data) return;
+    const ctx = document.getElementById('chart-gradient').getContext('2d');
+    if (gradientChart) gradientChart.destroy();
+    gradientChart = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels:data.map(d=>d.distance_range),
+        datasets:[{
+          label:indLabels[indicator]||indicator,
+          data:data.map(d=>d.avg_val),
+          backgroundColor:data.map((_,i)=>`rgba(${indicator==='dissolved_oxygen'?'6,182,212':indicator==='cod'?'234,179,8':indicator==='inorganic_nitrogen'?'249,115,22':indicator==='active_phosphate'?'168,85,247':indicator==='petroleum'?'239,68,68':'34,197,94'},${0.7-i*0.06})`),
+          borderColor:indColors[indicator]||'#06b6d4',borderWidth:1,borderRadius:4
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.03)'},min:0}}
+      }
+    });
+  }
+
+  // Gradient indicator switching
+  document.getElementById('gradient-indicators').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.grad-btn');
+    if (!btn) return;
+    document.querySelectorAll('.grad-btn').forEach(b=>{b.classList.remove('active');b.style.background='transparent';b.style.borderColor='rgba(255,255,255,0.1)';b.style.color='rgba(207,250,254,0.6)';});
+    btn.classList.add('active');btn.style.background='rgba(6,182,212,0.2)';btn.style.borderColor='rgba(6,182,212,0.3)';btn.style.color='#67e8f9';
+    const ind = btn.dataset.ind;
+    if (!gradientData[ind]) {
+      const res = await fetch(API+'/distance-gradient?indicator='+ind).then(r=>r.json());
+      gradientData[ind] = res.data;
+    }
+    renderGradientChart(ind);
+  });
+
+  function renderCityTable(data) {
+    const tbody = document.getElementById('city-tbody');
+    tbody.innerHTML = data.map(c => `
+      <tr class="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+        <td class="py-2.5 pr-4 text-cyan-100 font-medium">${c.city_cn}</td>
+        <td class="py-2.5 pr-4 text-cyan-400/50">${c.points}</td>
+        <td class="py-2.5 pr-4 text-cyan-200/70">${parseFloat(c.avg_ph).toFixed(2)}</td>
+        <td class="py-2.5 pr-4 text-amber-400/70">${parseFloat(c.avg_cod).toFixed(2)}</td>
+        <td class="py-2.5 pr-4 text-orange-400/70">${parseFloat(c.avg_nitrogen).toFixed(4)}</td>
+        <td class="py-2.5 pr-4 text-red-400/70">${parseFloat(c.avg_petroleum).toFixed(4)}</td>
+      </tr>
+    `).join('');
+  }
+
+  // 视频背景自动播放
+  (function(){
+    var v = document.getElementById('global-video');
+    v.muted = true;
+    v.play().catch(function(){});
+    document.addEventListener('click', function(){ v.muted = true; v.play().catch(function(){}); }, {once:true});
+  })();
+})();
+</script>
+</div><!-- 内容区结束 -->
+</body>
+</html>

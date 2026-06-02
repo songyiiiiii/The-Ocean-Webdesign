@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>全球海洋微塑料监测 - Ocean Guardian</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script>
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    if (typeof url === 'string' && url.includes('events.mapbox.com')) {
+      return new Promise(function(resolve) { resolve({ ok: false, status: 0, json: function(){ return Promise.resolve({}); }, text: function(){ return Promise.resolve(''); } }); });
+    }
+    return _origFetch.apply(this, arguments);
+  };
+  var _origSendBeacon = navigator.sendBeacon;
+  navigator.sendBeacon = function(url, data) {
+    if (typeof url === 'string' && url.includes('events.mapbox.com')) return true;
+    return _origSendBeacon.apply(navigator, arguments);
+  };
+  </script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="./app-config.js"></script>
+  <script src="./mapbox-config.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:#020a14}
+    ::-webkit-scrollbar-thumb{background:#0e7490;border-radius:3px}
+    body{background:#020a14;color:#cffafe;overflow-x:hidden}
+
+    #global-video-bg{position:fixed;top:0;left:0;width:100%;height:100vh;z-index:0;overflow:hidden;opacity:0.55;transition:opacity 0.8s cubic-bezier(0.4,0,0.2,1)}
+    #global-video-bg video{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0}
+    #global-video-bg .video-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,rgba(0,10,30,0.7) 0%,rgba(2,15,35,0.6) 50%,rgba(0,5,20,0.7) 100%)}
+    #global-video-bg .bottom-gradient{position:absolute;bottom:0;left:0;width:100%;height:40%;background:linear-gradient(to top,rgba(2,10,20,1) 0%,transparent 100%);pointer-events:none}
+
+    .tactile-base{background:rgba(2,15,35,0.7);border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(12px)}
+    .tactile-inset{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.04)}
+    .zh-note{display:block;font-size:12px;color:rgba(207,250,254,0.35);margin-top:2px}
+    .stat-card{transition:all 0.3s}
+    .stat-card:hover{transform:translateY(-2px);border-color:rgba(6,182,212,0.3)}
+    .quality-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+    #microplastics-map{opacity:0.78;transition:opacity 0.5s}
+    #loading-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:5;display:flex;align-items:center;gap:8px;font-size:14px;color:rgba(207,250,254,0.7)}
+    .spinner{width:20px;height:20px;border:2px solid rgba(6,182,212,0.2);border-top-color:#06b6d4;border-radius:50%;animation:spin 0.8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body class="font-['Inter',sans-serif]">
+
+<!-- 动态视频背景 -->
+<div id="global-video-bg">
+  <video autoplay muted loop playsinline id="global-video">
+    <source src="public/ocean-bg.mp4" type="video/mp4">
+  </video>
+  <div class="video-overlay"></div>
+  <div class="bottom-gradient"></div>
+</div>
+
+<div style="position:relative;z-index:1;">
+
+<!-- Header -->
+<header class="fixed top-0 left-0 right-0 z-50 tactile-base border-b border-white/5" style="backdrop-filter:blur(20px);">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <iconify-icon icon="mdi:bottle-wine-outline" width="28" class="text-purple-400"></iconify-icon>
+      <div>
+        <h1 class="text-lg font-bold text-cyan-50">全球海洋微塑料监测</h1>
+        <span class="text-xs text-cyan-400/40">Global Marine Microplastics · NCEI 1970-2022</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 text-sm">
+      <a href="ocean-guardian.html" class="text-cyan-400/60 hover:text-cyan-300 transition-colors no-underline">&larr; 返回主页</a>
+      <span class="text-cyan-400/20">|</span>
+      <span class="text-cyan-400/40 text-xs">NCEI Marine Microplastics · NOAA</span>
+    </div>
+  </div>
+</header>
+
+<main class="pt-16">
+
+  <!-- Stats Bar -->
+  <section class="py-6 px-4">
+    <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-4" id="stats-bar">
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-purple-400" id="stat-total">--</div><span class="text-xs text-cyan-400/50">全球采样点</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-cyan-400" id="stat-oceans">--</div><span class="text-xs text-cyan-400/50">覆盖大洋</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-amber-400" id="stat-avg">--</div><span class="text-xs text-cyan-400/50">平均浓度</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-red-400" id="stat-max">--</div><span class="text-xs text-cyan-400/50">最高浓度</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-emerald-400" id="stat-highpct">--</div><span class="text-xs text-cyan-400/50">高/极高占比</span></div>
+    </div>
+  </section>
+
+  <!-- 3D Globe Map -->
+  <section class="relative" style="height:65vh;">
+    <div id="microplastics-map" style="width:100%;height:100%;">
+      <div id="loading-overlay"><div class="spinner"></div> 加载全球微塑料数据...</div>
+    </div>
+    <div class="absolute bottom-4 left-4 tactile-base rounded-xl p-4 text-xs z-10" style="background:rgba(2,10,20,0.85);">
+      <div class="font-semibold text-cyan-200 mb-2">浓度等级 Concentration Class</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot" style="background:#22c55e;"></span>非常低 Very Low</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot" style="background:#86efac;"></span>低 Low</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot" style="background:#eab308;"></span>中 Medium</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot" style="background:#f97316;"></span>高 High</div>
+      <div class="flex items-center gap-2"><span class="quality-dot" style="background:#ef4444;"></span>非常高 Very High</div>
+    </div>
+    <div class="absolute top-4 right-4 tactile-base rounded-xl p-3 z-10 flex flex-col gap-2" style="background:rgba(2,10,20,0.85);">
+      <div class="text-xs text-cyan-400/60 mb-1">过滤筛选</div>
+      <select id="filter-ocean" class="text-xs bg-transparent border border-white/10 rounded-lg px-2 py-1 text-cyan-200" style="background:rgba(0,0,0,0.3);">
+        <option value="">全部大洋</option>
+      </select>
+      <select id="filter-class" class="text-xs bg-transparent border border-white/10 rounded-lg px-2 py-1 text-cyan-200" style="background:rgba(0,0,0,0.3);">
+        <option value="">全部浓度等级</option>
+        <option value="Very Low">非常低</option>
+        <option value="Low">低</option>
+        <option value="Medium">中</option>
+        <option value="High">高</option>
+        <option value="Very High">非常高</option>
+      </select>
+    </div>
+  </section>
+
+  <!-- Charts Grid -->
+  <section class="py-10 px-4">
+    <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-6">
+
+      <!-- Ocean Comparison -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:earth" width="18" class="text-cyan-400"></iconify-icon>
+          各大洋微塑料污染对比
+        </h3>
+        <span class="zh-note mb-4">平均浓度与高污染占比 (High + Very High %)</span>
+        <div style="height:320px;"><canvas id="chart-oceans"></canvas></div>
+      </div>
+
+      <!-- Concentration Distribution -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:chart-bar" width="18" class="text-purple-400"></iconify-icon>
+          浓度等级分布
+        </h3>
+        <span class="zh-note mb-4">5个浓度等级的采样点数量与浓度范围</span>
+        <div style="height:320px;"><canvas id="chart-conc-dist"></canvas></div>
+      </div>
+
+      <!-- Yearly Trend -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:chart-line" width="18" class="text-amber-400"></iconify-icon>
+          年度微塑料监测趋势
+        </h3>
+        <span class="zh-note mb-4">年度采样点数与平均浓度变化</span>
+        <div style="height:320px;"><canvas id="chart-yearly"></canvas></div>
+      </div>
+
+      <!-- Top Countries -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:flag" width="18" class="text-emerald-400"></iconify-icon>
+          各国微塑料研究贡献
+        </h3>
+        <span class="zh-note mb-4">TOP 15 采样点数量排名</span>
+        <div style="height:320px;"><canvas id="chart-countries"></canvas></div>
+      </div>
+
+      <!-- Marine Settings -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:waves" width="18" class="text-blue-400"></iconify-icon>
+          海洋环境类型分布
+        </h3>
+        <span class="zh-note mb-4">不同采样环境的数据占比</span>
+        <div style="height:300px;"><canvas id="chart-settings"></canvas></div>
+      </div>
+
+      <!-- Data Source Info -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:database" width="18" class="text-teal-400"></iconify-icon>
+          数据来源与说明
+        </h3>
+        <span class="zh-note mb-4">NCEI Marine Microplastics Database</span>
+        <div class="space-y-3 text-xs text-cyan-200/70" id="data-info">
+          <div class="tactile-inset rounded-xl p-4">
+            <p class="font-semibold text-cyan-200 mb-1">NOAA NCEI Marine Microplastics</p>
+            <p class="text-cyan-400/40">全球海洋微塑料浓度数据库，收录来自各国科研机构提交的微塑料监测数据</p>
+          </div>
+          <div class="tactile-inset rounded-xl p-4">
+            <p class="font-semibold text-cyan-200 mb-1">数据覆盖</p>
+            <p class="text-cyan-400/40">五大洋（太平洋、大西洋、印度洋、北冰洋、南大洋），1970-2022年，22470+条记录</p>
+          </div>
+          <div class="tactile-inset rounded-xl p-4">
+            <p class="font-semibold text-cyan-200 mb-1">浓度等级说明</p>
+            <p class="text-cyan-400/40">Very Low: 0-1 | Low: 1-10 | Medium: 10-500 | High: 500-1000 | Very High: &gt;1000 (根据NCEI分类)</p>
+          </div>
+          <div class="tactile-inset rounded-xl p-4" id="ocean-summary-detail"></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="border-t border-white/5 py-8 text-center">
+    <p class="text-xs text-cyan-400/30">NOAA NCEI Marine Microplastics Database · Ocean Guardian Global Monitoring System</p>
+  </footer>
+</main>
+</div>
+
+<script>
+(function(){
+  const API = (window.API_BASE_URL || 'http://localhost:5000/api') + '/microplastics';
+  mapboxgl.accessToken = window.MAPBOX_ACCESS_TOKEN || '';
+
+  // 视频背景
+  (function(){
+    var v = document.getElementById('global-video');
+    v.muted = true;
+    v.play().catch(function(){});
+    document.addEventListener('click', function(){ v.muted = true; v.play().catch(function(){}); }, {once:true});
+  })();
+
+  // 全局数据存储
+  let allPoints = [];
+  let oceanList = [];
+
+  // ===== 3D Globe =====
+  const map = new mapboxgl.Map({
+    container: 'microplastics-map',
+    style: 'mapbox://styles/mapbox/dark-v11',
+    center: [0, 20],
+    zoom: 1.5,
+    projection: 'globe',
+    attributionControl: false
+  });
+
+  map.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: true, visualizePitch: true }), 'bottom-right');
+
+  map.on('style.load', () => {
+    try { map.setPaintProperty('water', 'fill-color', '#021e3a'); } catch(e) {}
+    try { map.setPaintProperty('water', 'fill-outline-color', '#053a5e'); } catch(e) {}
+  });
+
+  map.on('load', () => {
+    map.setFog({color:'#020a14', 'high-color':'#021d35', 'horizon-blend':0.12, 'space-color':'#010a16', 'star-intensity':0.7});
+    map.addSource('mp-points', {type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map.addLayer({
+      id:'mp-circles',
+      type:'circle',
+      source:'mp-points',
+      paint:{
+        'circle-radius':['interpolate',['linear'],['get','size'],0,3,500,6,5000,10,10000,14],
+        'circle-opacity':0.8,
+        'circle-stroke-color':'#fff',
+        'circle-stroke-width':0.3,
+        'circle-color':['get','color']
+      }
+    });
+    loadData();
+  });
+
+  // 自动旋转
+  let rot = setInterval(()=>{
+    if(!map.loaded())return;
+    const c=map.getCenter();
+    map.easeTo({center:[c.lng+0.04,c.lat],duration:2500,easing:t=>t});
+  },2700);
+  map.on('dragstart',()=>clearInterval(rot));
+
+  // 弹窗
+  map.on('click','mp-circles',e=>{
+    const p=e.features[0].properties;
+    new mapboxgl.Popup({closeButton:false}).setLngLat(e.lngLat).setHTML(
+      `<div style="color:#cffafe;font-size:11px;padding:4px;">
+        <strong>${p.ocean||'Unknown'}</strong><br>
+        Region: ${p.region||'--'}<br>
+        Country: ${p.country||'--'}<br>
+        Measurement: ${p.measurement||'--'} ${p.unit||''}<br>
+        Class: <span style="color:${p.color}">${p.conc_class||'--'}</span><br>
+        Date: ${p.sample_date||'--'}
+      </div>`).addTo(map);
+  });
+
+  // 浓度颜色映射
+  function classColor(cc){
+    const map = {'Very Low':'#22c55e','Low':'#86efac','Medium':'#eab308','High':'#f97316','Very High':'#ef4444'};
+    return map[cc]||'#666';
+  }
+
+  function classSize(cc){
+    const map = {'Very Low':4,'Low':5,'Medium':7,'High':9,'Very High':11};
+    return map[cc]||5;
+  }
+
+  // 渲染地图点
+  function renderMapPoints(pts){
+    var features=pts.filter(p=>p.lat&&p.lon).map(p=>{
+      const cc=p.conc_class||'Medium';
+      return {
+        type:'Feature',
+        geometry:{type:'Point',coordinates:[p.lon,p.lat]},
+        properties:{
+          color:classColor(cc),
+          size:classSize(cc),
+          ocean:p.ocean||'Unknown',
+          region:p.region||'',
+          country:p.country||'',
+          measurement:p.measurement,
+          unit:p.unit||'',
+          conc_class:cc,
+          sample_date:p.sample_date||''
+        }
+      };
+    });
+    map.getSource('mp-points').setData({type:'FeatureCollection',features});
+    document.getElementById('loading-overlay').style.display='none';
+  }
+
+  // 过滤功能
+  function applyFilter(){
+    const ocean=document.getElementById('filter-ocean').value;
+    const cc=document.getElementById('filter-class').value;
+    let filtered=allPoints;
+    if(ocean) filtered=filtered.filter(p=>p.ocean===ocean);
+    if(cc) filtered=filtered.filter(p=>p.conc_class===cc);
+    renderMapPoints(filtered);
+  }
+
+  document.getElementById('filter-ocean').addEventListener('change',applyFilter);
+  document.getElementById('filter-class').addEventListener('change',applyFilter);
+
+  // ===== 加载数据 =====
+  async function loadData(){
+    try{
+      const [overview, yearly, oceans, countries, concDist, mapPts] = await Promise.all([
+        fetch(API+'/overview').then(r=>r.json()),
+        fetch(API+'/yearly').then(r=>r.json()),
+        fetch(API+'/oceans').then(r=>r.json()),
+        fetch(API+'/countries').then(r=>r.json()),
+        fetch(API+'/concentration-distribution').then(r=>r.json()),
+        fetch(API+'/map-points?sample=4000').then(r=>r.json())
+      ]);
+
+      allPoints = mapPts;
+
+      // 填充大洋筛选下拉
+      const sel=document.getElementById('filter-ocean');
+      overview.ocean_distribution.forEach(o=>{
+        const opt=document.createElement('option');
+        opt.value=o.ocean;opt.textContent=`${o.ocean} (${o.cnt})`;
+        sel.appendChild(opt);
+      });
+
+      updateStats(overview, oceans);
+      renderMapPoints(mapPts);
+      renderOceanChart(oceans);
+      renderYearlyChart(yearly);
+      renderConcDistChart(concDist);
+      renderCountryChart(countries);
+      renderSettingsChart(overview.marine_settings);
+      renderOceanSummary(oceans);
+    }catch(e){console.error(e);document.getElementById('loading-overlay').textContent='数据加载失败';}
+  }
+
+  function updateStats(ov, oceans){
+    document.getElementById('stat-total').textContent=(ov.total_points||0).toLocaleString();
+    document.getElementById('stat-oceans').textContent=(ov.ocean_distribution||[]).length;
+    const allAvg=(ov.concentration_classes||[]).reduce((s,c)=>s+c.cnt*c.avg_val,0)/(ov.total_points||1);
+    document.getElementById('stat-avg').textContent=allAvg.toFixed(1);
+    const maxAvg=Math.max(...(ov.concentration_classes||[]).map(c=>c.avg_val||0));
+    document.getElementById('stat-max').textContent=maxAvg>1000?(maxAvg/1000).toFixed(1)+'k':maxAvg.toFixed(1);
+    const highTotal=(ov.concentration_classes||[]).filter(c=>c.conc_class==='High'||c.conc_class==='Very High').reduce((s,c)=>s+c.cnt,0);
+    document.getElementById('stat-highpct').textContent=((highTotal/ov.total_points)*100).toFixed(1)+'%';
+  }
+
+  // ===== Charts =====
+  Chart.defaults.color='rgba(207,250,254,0.6)';
+  Chart.defaults.borderColor='rgba(255,255,255,0.06)';
+  Chart.defaults.font.family='Inter, sans-serif';
+
+  function renderOceanChart(data){
+    new Chart(document.getElementById('chart-oceans'),{
+      type:'bar',
+      data:{
+        labels:data.map(d=>d.ocean),
+        datasets:[
+          {
+            label:'平均浓度',
+            data:data.map(d=>d.avg_conc),
+            backgroundColor:'#06b6d460',
+            borderColor:'#06b6d4',
+            borderWidth:1,
+            yAxisID:'y'
+          },
+          {
+            label:'高污染占比 (%)',
+            data:data.map(d=>parseFloat(d.high_pct)||0),
+            backgroundColor:'#ef444460',
+            borderColor:'#ef4444',
+            borderWidth:1,
+            yAxisID:'y1'
+          }
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{labels:{usePointStyle:true,pointStyle:'rect',padding:12,font:{size:10}}},
+          tooltip:{callbacks:{label:function(ctx){if(ctx.datasetIndex===0)return'Avg: '+Number(ctx.raw).toFixed(1);return'High%: '+Number(ctx.raw).toFixed(1)+'%';}}}
+        },
+        scales:{
+          x:{grid:{display:false},ticks:{font:{size:9}}},
+          y:{title:{text:'平均浓度',display:true,font:{size:10}},grid:{color:'rgba(255,255,255,0.03)'},type:'logarithmic',ticks:{callback:v=>v>=1000?(v/1000)+'k':v}},
+          y1:{position:'right',title:{text:'高污染占比 %',display:true,font:{size:10}},grid:{display:false},min:0,max:100,ticks:{callback:v=>v+'%'}}
+        }
+      }
+    });
+  }
+
+  function renderYearlyChart(data){
+    if(!data||data.length===0){
+      document.getElementById('chart-yearly').parentElement.innerHTML='<p class="text-xs text-cyan-400/40 text-center pt-24">年度数据解析中（日期标准化处理）</p>';
+      return;
+    }
+    new Chart(document.getElementById('chart-yearly'),{
+      type:'line',
+      data:{
+        labels:data.map(d=>d.yr),
+        datasets:[
+          {label:'采样点数',data:data.map(d=>d.points),borderColor:'#06b6d4',backgroundColor:'rgba(6,182,212,0.1)',tension:0.4,fill:true,yAxisID:'y'},
+          {label:'平均浓度',data:data.map(d=>d.avg_conc),borderColor:'#eab308',tension:0.4,yAxisID:'y1',pointRadius:3},
+          {label:'最高浓度',data:data.map(d=>d.max_conc),borderColor:'#ef4444',tension:0.4,yAxisID:'y1',pointRadius:2,borderDash:[4,2]}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{usePointStyle:true,pointStyle:'circle',padding:14,font:{size:10}}}},
+        scales:{
+          x:{grid:{color:'rgba(255,255,255,0.03)'}},
+          y:{title:{text:'采样点',display:true,font:{size:10}},grid:{color:'rgba(255,255,255,0.03)'},min:0},
+          y1:{position:'right',title:{text:'浓度',display:true,font:{size:10}},grid:{display:false},type:'logarithmic',ticks:{callback:v=>v>=1000?(v/1000)+'k':v}}
+        }
+      }
+    });
+  }
+
+  function renderConcDistChart(data){
+    new Chart(document.getElementById('chart-conc-dist'),{
+      type:'bar',
+      data:{
+        labels:data.map(d=>d.conc_class),
+        datasets:[
+          {label:'采样点数',data:data.map(d=>d.cnt),backgroundColor:['#22c55e60','#86efac60','#eab30860','#f9731660','#ef444460'],borderColor:['#22c55e','#86efac','#eab308','#f97316','#ef4444'],borderWidth:1,yAxisID:'y'},
+          {label:'平均浓度',data:data.map(d=>d.avg_val),type:'line',borderColor:'#fff',backgroundColor:'rgba(255,255,255,0.1)',pointRadius:4,pointBackgroundColor:'#fff',tension:0.3,yAxisID:'y1'}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{usePointStyle:true,pointStyle:'rect',padding:12,font:{size:10}}}},
+        scales:{
+          x:{grid:{display:false},ticks:{font:{size:9}}},
+          y:{title:{text:'Count',display:true,font:{size:10}},grid:{color:'rgba(255,255,255,0.03)'},min:0},
+          y1:{position:'right',title:{text:'Avg Conc',display:true,font:{size:10}},grid:{display:false},type:'logarithmic',ticks:{callback:v=>v>=1000?(v/1000)+'k':v}}
+        }
+      }
+    });
+  }
+
+  function renderCountryChart(data){
+    const top15=data.slice(0,15);
+    new Chart(document.getElementById('chart-countries'),{
+      type:'bar',
+      data:{
+        labels:top15.map(d=>d.country),
+        datasets:[
+          {label:'采样点',data:top15.map(d=>d.points),backgroundColor:'#06b6d460',borderColor:'#06b6d4',borderWidth:1}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,indexAxis:'y',
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{font:{size:9}}},
+          y:{grid:{display:false},ticks:{font:{size:9}}}
+        }
+      }
+    });
+  }
+
+  function renderSettingsChart(data){
+    new Chart(document.getElementById('chart-settings'),{
+      type:'doughnut',
+      data:{
+        labels:data.map(d=>d.marine_setting),
+        datasets:[{
+          data:data.map(d=>d.cnt),
+          backgroundColor:['#06b6d460','#8b5cf660','#eab30860','#22c55e60','#ef444460','#a855f760','#f9731660','#64748b60'],
+          borderColor:'rgba(2,15,35,0.8)',
+          borderWidth:2
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{position:'bottom',labels:{padding:12,font:{size:9},usePointStyle:true,pointStyle:'circle'}}
+        }
+      }
+    });
+  }
+
+  function renderOceanSummary(oceans){
+    document.getElementById('ocean-summary-detail').innerHTML = oceans.map(o=>
+      `<div class="flex items-center justify-between mb-2">
+        <span class="text-cyan-200/70">${o.ocean}</span>
+        <span class="font-semibold">
+          <span class="text-cyan-300">${Number(o.avg_conc).toFixed(1)}</span>
+          <span class="text-cyan-400/30 ml-2">高污染${o.high_pct}%</span>
+        </span>
+      </div>`
+    ).join('');
+  }
+
+})();
+</script>
+</div>
+</body>
+</html>
