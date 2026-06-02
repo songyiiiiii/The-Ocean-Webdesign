@@ -243,16 +243,39 @@ function getUnit(param) {
 // ========== 健康检查 ==========
 app.get('/api/health', async (req, res) => {
   let dbStatus = 'unknown';
+  let dbCode = '';
   try {
     const [rows] = await db.query('SELECT 1 AS ok');
     dbStatus = rows[0].ok === 1 ? 'connected' : 'error';
   } catch (e) {
     dbStatus = 'disconnected: ' + e.message;
+    dbCode = e.code || '';
   }
+
+  // 原始 TCP 连通性测试
+  let tcpStatus = 'unknown';
+  try {
+    const net = require('net');
+    await new Promise((resolve, reject) => {
+      const s = net.connect({
+        host: process.env.DB_HOST || 'localhost',
+        port: Number(process.env.DB_PORT || 3306)
+      }, () => { s.end(); resolve(); });
+      s.on('error', reject);
+      s.setTimeout(8000, () => { s.destroy(); reject(new Error('TCP timeout')); });
+    });
+    tcpStatus = 'reachable';
+  } catch (e) {
+    tcpStatus = 'blocked: ' + e.message;
+  }
+
   res.json({
     status: 'OK',
     message: '海洋保护API运行正常',
     database: dbStatus,
+    dbCode: dbCode,
+    tcpToDb: tcpStatus,
+    dbTarget: `${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306}`,
     websocket: true
   });
 });
