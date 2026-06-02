@@ -1,2 +1,1 @@
-// Mapbox 配置（暂未使用，预留）
-window.MAPBOX_TOKEN = '';
+window.MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic29uZ3lpaWlpaWkiLCJhIjoiY21wODJnMDh1MGFieTJxcTF4OTBrajdzeiJ9.F9RzNEJFQ9S2HbMWXp5zUg';
