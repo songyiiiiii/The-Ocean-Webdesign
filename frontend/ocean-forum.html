@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ocean Guardian - Community Forum</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:#020a14}
+    ::-webkit-scrollbar-thumb{background:#0e7490;border-radius:3px}
+    body{background:#020a14;color:#cffafe;overflow-x:hidden;font-family:'Inter',sans-serif}
+    #global-video-bg{position:fixed;top:0;left:0;width:100%;height:100vh;z-index:0;overflow:hidden}
+    #global-video-bg video{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(0.3) brightness(0.95) contrast(1.05) blur(0.3px)}
+    #global-video-bg .video-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,rgba(255,255,255,0.08) 0%,rgba(200,230,255,0.04) 25%,rgba(150,200,220,0.03) 50%,rgba(255,255,255,0.06) 75%,rgba(100,150,180,0.05) 100%);backdrop-filter:blur(1px) brightness(1.1);-webkit-backdrop-filter:blur(1px) brightness(1.1)}
+    #global-video-bg .bottom-gradient{position:absolute;bottom:0;left:0;width:100%;height:200px;background:linear-gradient(to top,rgba(2,10,20,0.75) 0%,transparent 100%);pointer-events:none}
+    .glass-ripple{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:16;background:repeating-linear-gradient(0deg,transparent 0px,rgba(150,200,240,0.03) 2px,transparent 4px,rgba(100,180,220,0.02) 6px,transparent 8px);animation:glassWave 12s ease-in-out infinite}
+    @keyframes glassWave{0%,100%{background-position:0 0}50%{background-position:0 10px}}
+    .page-content{position:relative;z-index:5;min-height:100vh}
+    .nav-glass{background:linear-gradient(135deg,rgba(6,182,212,0.08),rgba(2,10,20,0.75));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(6,182,212,0.15);box-shadow:0 4px 30px rgba(0,0,0,0.5)}
+    .tactile-base{background:linear-gradient(145deg,rgba(8,30,50,0.85),rgba(2,10,20,0.9));border:1px solid rgba(6,182,212,0.12);box-shadow:inset 0 1px 0 rgba(6,182,212,0.08),0 4px 20px rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .tactile-inset{background:linear-gradient(145deg,rgba(2,10,20,0.55),rgba(4,16,28,0.65));border:1px solid rgba(6,182,212,0.08);box-shadow:inset 0 2px 8px rgba(0,0,0,0.4),0 1px 0 rgba(6,182,212,0.04);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+    .btn-physical-dark{background:linear-gradient(145deg,rgba(8,30,50,0.8),rgba(2,10,20,0.9));border:1px solid rgba(6,182,212,0.2);box-shadow:0 2px 6px rgba(0,0,0,0.3);transition:all 0.2s;cursor:pointer}
+    .btn-physical-dark:hover{background:linear-gradient(145deg,rgba(12,40,65,0.9),rgba(4,16,28,0.95));border-color:rgba(6,182,212,0.35);box-shadow:0 4px 12px rgba(6,182,212,0.1)}
+    .btn-physical-light{background:linear-gradient(145deg,rgba(6,182,212,0.25),rgba(20,120,160,0.2));border:1px solid rgba(6,182,212,0.35);box-shadow:0 2px 8px rgba(6,182,212,0.1);transition:all 0.2s;cursor:pointer;color:#cffafe}
+    .btn-physical-light:hover{background:linear-gradient(145deg,rgba(6,182,212,0.4),rgba(20,150,190,0.3));border-color:rgba(6,182,212,0.55);box-shadow:0 4px 16px rgba(6,182,212,0.2)}
+    .zh-note{font-size:0.78em;opacity:0.5;margin-left:0.25em;font-weight:400}
+    .post-image{transition:transform 0.4s ease}
+    .post-image:hover{transform:scale(1.03)}
+    .toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(6,22,45,0.92);border:1px solid rgba(6,182,212,0.25);color:#cffafe;padding:10px 24px;border-radius:24px;font-size:14px;z-index:999;opacity:0;transition:all 0.35s cubic-bezier(0.4,0,0.2,1);backdrop-filter:blur(12px);pointer-events:none}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .reposted-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);border-radius:20px;padding:2px 10px;font-size:11px;color:#67e8f9}
+  </style>
+</head>
+<body>
+
+<div id="global-video-bg">
+  <video loop playsinline autoplay muted id="global-video">
+    <source src="public/ocean-bg.mp4" type="video/mp4">
+  </video>
+  <div class="video-overlay"></div>
+  <div class="bottom-gradient"></div>
+</div>
+<div class="glass-ripple"></div>
+
+<div class="page-content">
+  <nav class="nav-glass fixed top-0 left-0 right-0 z-50 px-6 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <a href="ocean-guardian.html" class="flex items-center gap-3 no-underline">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center">
+          <iconify-icon icon="mdi:shield-water" width="18" class="text-white"></iconify-icon>
+        </div>
+        <span class="text-lg font-bold text-cyan-50">Ocean Guardian</span>
+      </a>
+      <div class="flex items-center gap-4 md:gap-6 text-sm">
+        <a href="ocean-guardian.html" class="text-cyan-400/60 hover:text-cyan-300 transition-colors no-underline">Home</a>
+        <a href="user-profile.html" class="text-cyan-400/60 hover:text-cyan-300 transition-colors no-underline">Profile</a>
+        <a href="ocean-forum.html" class="text-cyan-300 transition-colors no-underline font-medium">Forum</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-5xl mx-auto px-4 pt-24 pb-20">
+
+    <div class="text-center mb-10">
+      <h1 class="text-4xl md:text-5xl font-bold text-cyan-50">Ocean Guardian Community</h1>
+      <span class="zh-note text-base block mt-1">海洋守护者社区论坛</span>
+      <p class="mt-3 text-cyan-200/50 max-w-xl mx-auto text-sm">Share observations, discuss ocean issues, and connect with fellow guardians</p>
+    </div>
+
+    <!-- 发帖表单 -->
+    <div class="tactile-base rounded-2xl p-6 mb-8" id="new-post-form-container">
+      <h3 class="text-sm font-semibold text-cyan-50 flex items-center gap-2 mb-4">
+        <iconify-icon icon="mdi:plus-circle" width="18" class="text-cyan-400"></iconify-icon>
+        Create Post <span class="zh-note">发布新帖</span>
+      </h3>
+      <form id="new-post-form" onsubmit="submitPost(event)">
+        <div class="grid md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="text-xs text-cyan-400/60 block mb-1.5">Nickname</label>
+            <input type="text" id="post-author" required placeholder="Your display name"
+              class="w-full bg-cyan-950/30 border border-cyan-500/15 rounded-lg px-4 py-2.5 text-sm text-cyan-100 placeholder:text-cyan-400/25 focus:outline-none focus:border-cyan-400/40 transition-colors">
+          </div>
+          <div>
+            <label class="text-xs text-cyan-400/60 block mb-1.5">Title</label>
+            <input type="text" id="post-title" required placeholder="What's on your mind?"
+              class="w-full bg-cyan-950/30 border border-cyan-500/15 rounded-lg px-4 py-2.5 text-sm text-cyan-100 placeholder:text-cyan-400/25 focus:outline-none focus:border-cyan-400/40 transition-colors">
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="text-xs text-cyan-400/60 block mb-1.5">Content</label>
+          <textarea id="post-content" required rows="4" placeholder="Share your story, observation, or thoughts..."
+            class="w-full bg-cyan-950/30 border border-cyan-500/15 rounded-lg px-4 py-2.5 text-sm text-cyan-100 placeholder:text-cyan-400/25 focus:outline-none focus:border-cyan-400/40 transition-colors resize-none"></textarea>
+        </div>
+        <div class="mb-4">
+          <label class="text-xs text-cyan-400/60 block mb-1.5">Image (optional)</label>
+          <div class="flex items-center gap-3">
+            <label class="btn-physical-dark px-4 py-2 rounded-lg text-xs cursor-pointer inline-flex items-center gap-1.5">
+              <iconify-icon icon="mdi:image-plus" width="14"></iconify-icon> Choose Image
+              <input type="file" id="post-image" accept="image/*" class="hidden" onchange="previewPostImage(event)">
+            </label>
+            <span id="image-preview-name" class="text-xs text-cyan-400/30"></span>
+            <button type="button" id="clear-image-btn" class="text-xs text-red-400/50 hover:text-red-400 hidden" onclick="clearPostImage()">
+              <iconify-icon icon="mdi:close-circle" width="14"></iconify-icon>
+            </button>
+          </div>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-cyan-400/30">Be respectful. Posts are public. Max image size: 2MB</span>
+          <button type="submit" class="btn-physical-light px-6 py-2.5 rounded-lg text-sm font-medium">
+            <iconify-icon icon="mdi:send" width="14" class="inline mr-1"></iconify-icon> Post
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 筛选标签 -->
+    <div class="flex flex-wrap items-center gap-2 mb-6" id="tag-filters">
+      <button onclick="renderPosts(null)" class="text-xs px-3 py-1.5 rounded-full bg-cyan-500/20 border border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/30 transition-colors cursor-pointer">All</button>
+      <button onclick="renderPosts('Ocean Cleanup')" class="text-xs px-3 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/10 text-cyan-400/50 hover:bg-cyan-950/60 transition-colors cursor-pointer">Ocean Cleanup</button>
+      <button onclick="renderPosts('Coral')" class="text-xs px-3 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/10 text-cyan-400/50 hover:bg-cyan-950/60 transition-colors cursor-pointer">Coral</button>
+      <button onclick="renderPosts('Marine Life')" class="text-xs px-3 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/10 text-cyan-400/50 hover:bg-cyan-950/60 transition-colors cursor-pointer">Marine Life</button>
+      <button onclick="renderPosts('Citizen Science')" class="text-xs px-3 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/10 text-cyan-400/50 hover:bg-cyan-950/60 transition-colors cursor-pointer">Citizen Science</button>
+      <button onclick="renderPosts('Sustainable Food')" class="text-xs px-3 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/10 text-cyan-400/50 hover:bg-cyan-950/60 transition-colors cursor-pointer">Sustainable Food</button>
+      <button onclick="renderPosts('Lifestyle')" class="text-xs px-3 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/10 text-cyan-400/50 hover:bg-cyan-950/60 transition-colors cursor-pointer">Lifestyle</button>
+      <button onclick="renderPosts('Policy')" class="text-xs px-3 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/10 text-cyan-400/50 hover:bg-cyan-950/60 transition-colors cursor-pointer">Policy</button>
+      <button onclick="renderPosts('Health')" class="text-xs px-3 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/10 text-cyan-400/50 hover:bg-cyan-950/60 transition-colors cursor-pointer">Health</button>
+    </div>
+
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-lg font-semibold text-cyan-50 flex items-center gap-2">
+        <iconify-icon icon="mdi:forum" width="20" class="text-cyan-400"></iconify-icon>
+        Community Posts
+      </h2>
+      <span class="text-xs text-cyan-400/30" id="post-count">Loading...</span>
+    </div>
+
+    <div class="space-y-5" id="posts-container"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 32 篇种子帖子（含真实评论） =====
+const seedPosts = [
+  {
+    id: 1, author: 'OceanExplorer', date: '2026-05-20', likes: 34, reposts: 7, image: 'https://images.unsplash.com/photo-1621451537084-482c73073a0f?w=800&q=80',
+    title: "The Ocean Cleanup hits 52 million kg — 30 Cities Program now live across 5 continents",
+    content: "Massive milestone! The Ocean Cleanup just crossed 52 million kg of trash removed from aquatic ecosystems. Their 30 Cities Program targets a one-third reduction in river-based plastic emissions by 2030, and they've secured $121M from The Audacious Project. New Interceptor barriers are being deployed in LA, Manila Bay, Mumbai, and Jakarta this summer. For those unfamiliar — Interceptors are floating barriers that catch trash flowing down rivers before it reaches the ocean. Each one can trap tens of thousands of kg per day during the rainy season.\n\nWhat I find most inspiring is that this started with a 17-year-old's high school science project. Boyan Slat was just a teenager when he first proposed the idea, and now look at where we are. It really shows that individuals can make a difference.\n\nThe Mumbai deployment is particularly critical — a year-long study found that ~5 million kg of plastic flows into the Arabian Sea from Mumbai alone every year. Two Interceptors are planned for Trombay and Malad. I'm curious to see the impact data after the first monsoon season.\n\nHas anyone here seen an Interceptor in action? I'd love to hear firsthand accounts!",
+    tags: ['Ocean Cleanup','Plastic Pollution','Technology'],
+    comments: [
+      {author:'CoastWalker',date:'2026-05-20',text:"I saw the Interceptor in Los Angeles last month! It's way bigger than I expected — almost like a small floating building. The amount of trash it catches after a rainstorm is both impressive and depressing at the same time."},
+      {author:'PlasticFreeLife',date:'2026-05-21',text:"Love seeing this scale up! But I also think we need to focus more on upstream solutions — reducing single-use plastic production in the first place. Interceptors are treating symptoms, not the root cause."},
+      {author:'OceanExplorer',date:'2026-05-21',text:"Agreed, it needs to be both. The Ocean Cleanup also advocates for policy changes, but river interception prevents damage that's already been done. We can't just wait for perfect policy while millions of tons flow into the ocean every year."},
+      {author:'MarineEngineer42',date:'2026-05-22',text:"I work in waste management in Southeast Asia. The challenge here isn't just tech — it's infrastructure and enforcement. These interceptors are amazing but they also need local maintenance teams and waste processing capacity. The Ocean Cleanup has been partnering with local governments which is the right approach."},
+      {author:'HopefulSurfer',date:'2026-05-23',text:"52 million kg is incredible. For perspective, that's roughly the weight of 350 blue whales. I remember when people said this idea would never work at scale. Glad they were wrong."},
+    ]
+  },
+  {
+    id: 2, author: 'CoralGuardian', date: '2026-05-22', likes: 41, reposts: 9, image: 'https://images.unsplash.com/photo-1546026423-cc4642628d2b?w=800&q=80',
+    title: "Coral 'seedboxes' boost reef settlement 56x — a genuine restoration breakthrough",
+    content: "Just read about this and had to share: CSIRO and Southern Cross University developed floating coral nursery 'seedboxes' that hold millions of larvae and gradually release them near damaged reef beds. Settlement rates are up to 56 TIMES higher than traditional coral gardening!\n\nThe world's largest reef restoration test deployed 44,608 seeding devices across three reefs on the Great Barrier Reef. 13 vessels, ~130 people including Indigenous Rangers, ~14.6 million coral eggs collected. This is industrial-scale restoration.\n\nAlso exciting: the 'Flonduran' elkhorn corals — crossbred between Florida and Honduras populations — being tested in Dry Tortugas National Park for heat tolerance. And in the Seychelles, a lab breeding program produced ~800,000 embryos from just 14 colonies.\n\nI'm cautiously optimistic. After years of depressing coral news, these results feel like a genuine turning point. Though we obviously still need to address climate change — heat-tolerant corals can only handle so much warming.",
+    tags: ['Coral','Restoration','Marine Biology'],
+    comments: [
+      {author:'ReefDiver88',date:'2026-05-22',text:"I've volunteered with coral gardening in the Florida Keys for two years. The traditional method of hand-attaching fragments is painfully slow. This seedbox approach is on a completely different scale. Very exciting!"},
+      {author:'OceanOptimist',date:'2026-05-22',text:"The Flonduran project is fascinating — crossbreeding survivors of the 2023 marine heatwave with Honduran corals adapted to warmer water. Selective breeding for climate adaptation, basically."},
+      {author:'SkepticalMarine',date:'2026-05-23',text:"Call me cautious but we've seen 'breakthroughs' before. The real test is whether these corals survive the next bleaching event. I'll save my celebration for year 3 survival data."},
+      {author:'CoralGuardian',date:'2026-05-23',text:"Fair point! The seedbox trials are being monitored for survival, growth, and bleaching response. They're taking a rigorous approach. But even if it's not perfect, 56x improvement in settlement is worth paying attention to."},
+      {author:'ReefDiver88',date:'2026-05-24',text:"One thing that gets overlooked: the Indigenous Ranger involvement in the Great Barrier Reef deployment. Six Traditional Owner groups participated. That's how conservation should work — led by people who've stewarded these waters for thousands of years."},
+      {author:'NatureLover_TW',date:'2026-05-25',text:"Saw a coral spawning event in Taiwan last year and it was magical — like an underwater snowstorm. Glad to see scientists learning to harness this natural process better."},
+    ]
+  },
+  {
+    id: 3, author: 'MarineLife_Watch', date: '2026-05-25', likes: 47, reposts: 12, image: 'https://images.unsplash.com/photo-1560272564-c83b66b1ad12?w=800&q=80',
+    title: "50 whale sharks rescued in Kerala — fishermen become conservation heroes",
+    content: "Such a heartwarming story from India's coast. In Kerala, 18 fishermen were honored for their whale shark rescue efforts. To date, 50 whale sharks have been successfully rescued and released along Kerala's coast through community collaboration with the Wildlife Trust of India.\n\nGoa has now launched India's first dedicated marine conservation vessel, offering ₹75,000 rewards to fishermen who rescue whale sharks. Drones patrol the 105km coastline, and solar-electric boats are being introduced.\n\nMeanwhile in Tamil Nadu, over 295 fishermen trained since 2021 have rescued Olive Ridley, Green, Hawksbill, and Leatherback turtles, plus dolphins and tiger sharks. Over 181 tons of ghost nets removed from the sea.\n\nAnd on the other side of the world: North Atlantic right whales had 23 calves in 2026 — the highest since 2009!\n\nThe common thread in all these stories? Local communities leading conservation efforts. Former poachers becoming protectors. It works.",
+    tags: ['Marine Life','Whale Shark','Sea Turtle','Community'],
+    comments: [
+      {author:'OceanLover_IN',date:'2026-05-25',text:"As someone from Tamil Nadu, I can tell you the transformation is real. These fishermen went from seeing turtles as bycatch nuisance to radio-tagging them for research. Community-led conservation works when you respect local livelihoods."},
+      {author:'SharkAdvocate',date:'2026-05-26',text:"Whale sharks are such gentle giants. I swam with them in the Philippines and it changed my life. So glad to see this protection effort scaling up."},
+      {author:'PolicyNerd',date:'2026-05-26',text:"The ₹75,000 reward is smart policy design — it aligns economic incentives with conservation goals. Instead of punishing fishers for accidental catches, you reward them for rescue. More countries should adopt this model."},
+      {author:'MarineLife_Watch',date:'2026-05-27',text:"Right? The 'carrot' approach seems way more effective than the 'stick' for community conservation. And 181 tons of ghost nets removed is just staggering. Those nets would have kept killing marine life for decades."},
+      {author:'ConservationDad',date:'2026-05-27',text:"23 right whale calves! After years of watching their numbers decline, this is genuinely emotional news. My kids and I track the calving season every year and this is the best year by far."},
+      {author:'SharkAdvocate',date:'2026-05-28',text:"Anyone else planning a whale shark trip? I've heard the aggregations off the Yucatan are incredible from June to September. Would love to hear recommendations!"},
+      {author:'OceanLover_IN',date:'2026-05-28',text:"If you're in India, the Gujarat coast (particularly around Saurashtra) has good whale shark sightings during winter months. The local conservation groups there also run educational tours."},
+    ]
+  },
+  {
+    id: 4, author: 'DeepSeaObserver', date: '2026-05-26', likes: 38, reposts: 8, image: null,
+    title: "The ocean governance clash of 2026: BBNJ Treaty enters force as NOAA fast-tracks deep-sea mining",
+    content: "January 2026 saw two massive ocean governance milestones going in opposite directions.\n\nThe High Seas Treaty (BBNJ Agreement) officially entered into force on January 17 after 60+ ratifications. It creates legally binding protections for deep ocean ecosystems in international waters and establishes a framework for Marine Protected Areas on the high seas. This is huge — it's basically the ocean equivalent of the Paris Agreement.\n\nBut just four days later, NOAA finalized a rule fast-tracking deep seabed mining permits under a consolidated process. The Metals Company got approval to mine 65,000 sq km of the Clarion-Clipperton Zone. They anticipate the world's first commercial-scale deep-sea mining permit by Q1 2027.\n\nMeanwhile, 40 countries have called for a moratorium. 37 financial institutions are pushing for a pause.\n\nI don't know where I stand. We need critical minerals for the energy transition. But we know almost nothing about deep-sea ecosystems — and damage there could take decades or centuries to recover, if ever. What's the community's take?",
+    tags: ['Policy','Deep Sea','Mining','High Seas Treaty'],
+    comments: [
+      {author:'GreenEnergyFan',date:'2026-05-26',text:"I struggle with this too. On one hand, we need cobalt and nickel for EV batteries. On the other hand, we haven't even mapped 80% of the seabed. Mining before understanding is just reckless."},
+      {author:'OceanLawStudent',date:'2026-05-26',text:"Important context: the US isn't a party to UNCLOS or an ISA member. So NOAA's rule essentially creates a parallel governance track outside the multilateral system. That's why you see 40+ countries objecting."},
+      {author:'BatteryTechNerd',date:'2026-05-27',text:"LFP batteries now represent 1/3 of the global EV market and they don't use cobalt or nickel. Solid-state batteries from Toyota are coming. Battery recycling is advancing rapidly. The argument that we 'need' deep-sea minerals is looking weaker by the month."},
+      {author:'DeepSeaObserver',date:'2026-05-27',text:"That's a great point about LFP. If the market is already shifting toward chemistries that don't require deep-sea minerals, why take the risk? The 'essential for green transition' argument feels like it has a shelf life."},
+      {author:'PolicyNerd',date:'2026-05-28',text:"The juxtaposition of the BBNJ Treaty entering force and NOAA's rule in the same week is almost too perfect. It encapsulates the fundamental tension in ocean governance right now."},
+      {author:'GreenEnergyFan',date:'2026-05-28',text:"I'd add that independent assessments estimate potential damages from deep-sea mining could be up to $500 billion. The precautionary principle exists for a reason. Some things are worth more intact."},
+    ]
+  },
+  {
+    id: 5, author: 'BeachCleanupDaily', date: '2026-05-18', likes: 52, reposts: 15, image: 'https://images.unsplash.com/photo-1618477461853-cf6ed80faba5?w=800&q=80',
+    title: "Our weekend beach cleanup collected 340kg of trash — and we found something surprising",
+    content: "Organized a community beach cleanup last Saturday with 28 volunteers on the coast near Qingdao. We collected 340kg of trash in just 3 hours.\n\nThe surprising finding: only about 30% was obvious stuff like bottles and bags. The rest was micro-fragments — tiny pieces of foam, fishing line segments, nurdles (pre-production plastic pellets), and cigarette butts. Stuff you barely notice when walking on the beach but is absolutely devastating to marine life.\n\nWe used the Marine Debris Tracker app to log everything. The data goes to NOAA's global database. If you haven't tried citizen science apps yet, I highly recommend them — it makes cleanup feel more meaningful when you know your data contributes to research.\n\nSome tips if you want to organize your own cleanup:\n1. Bring multiple buckets (not plastic bags — ironic, right?)\n2. Separate trash as you collect (makes recycling easier)\n3. Wear gloves — we found syringes last time\n4. Take before/after photos — it's incredibly motivating\n5. Use apps like Marine Debris Tracker or Clean Swell to log data\n\nHas anyone else done a cleanup recently? What's the weirdest thing you've found?",
+    tags: ['Citizen Science','Beach Cleanup','Lifestyle'],
+    comments: [
+      {author:'QingdaoLocal',date:'2026-05-18',text:"I was there! The amount of nurdles was shocking. For those who don't know — nurdles are tiny plastic pellets that are the raw material for almost all plastic products. They spill during shipping and manufacturing and end up everywhere."},
+      {author:'CleanBeachClub',date:'2026-05-19',text:"Weirdest thing I found: a 1998 flip phone. It was completely encrusted with barnacles but still recognizable. Also found a message in a bottle once — it was in Spanish and seemed to be from a school project in Chile."},
+      {author:'BeachCleanupDaily',date:'2026-05-19',text:"A 1998 flip phone! That's museum-worthy. Our weirdest find was a perfectly intact lawn gnome. Still have no explanation for that one."},
+      {author:'EcoMom',date:'2026-05-19',text:"Love the tip about not using plastic bags for cleanup. I bring reusable mesh bags from the grocery store. My kids (7 and 9) have become obsessed with counting cigarette butts — we've gotten to over 200 in a single outing."},
+      {author:'CitizenScientist_SG',date:'2026-05-20',text:"Marine Debris Tracker is great but I've also been using Clean Swell by Ocean Conservancy. Both feed into global databases. The more data we have, the better policies we can advocate for."},
+      {author:'CleanBeachClub',date:'2026-05-20',text:"Has anyone tried the 'Take 3 for the Sea' approach? Just picking up 3 pieces of trash every time you leave the beach. Small habit but if everyone did it..."},
+    ]
+  },
+  {
+    id: 6, author: 'SustainableChef_Mia', date: '2026-05-15', likes: 28, reposts: 5, image: 'https://images.unsplash.com/photo-1534305148950-d7aa16038e43?w=800&q=80',
+    title: "I switched to plant-based tuna for a month — here's what happened",
+    content: "After learning that bluefin tuna populations are down to about 3% of their pre-fishing levels, I decided to try plant-based seafood alternatives for a full month. I documented the whole experience.\n\nWeek 1: Tried BettaF!sh TU-NAH (made from seaweed and fava beans). Honestly? On pizza and in pasta, I couldn't tell the difference. In a sandwich... mostly convincing. Texture is about 85% there.\n\nWeek 2: Discovered Revo Foods' mycoprotein-based salmon. It has omega-3 from microalgae and actually has more protein than farmed salmon. Made sushi rolls and my family didn't notice until I told them.\n\nWeek 3: The hard part — social situations. Went to a seafood restaurant with friends and ended up ordering the only plant-based option (a salad). This is where the industry still needs work. Most restaurants have zero plant-based seafood options.\n\nWeek 4: Got creative with seaweed. Made dulse-wrapped rice balls and kelp noodle soup. Seaweed is incredibly nutritious — more protein than you'd think, plus iodine, omega-3s, and minerals.\n\nTakeaways:\n- Plant-based seafood has come WAY further than I expected\n- It's about 30% cheaper than real fish in my area\n- The environmental impact difference is staggering (77% less CO2, 95% less water)\n- But the social/restaurant side still needs work\n- I'm keeping it for home cooking, eating sustainable-certified fish when dining out\n\nAnyone else tried these? What brands do you recommend?",
+    tags: ['Sustainable Food','Lifestyle','Ocean-Friendly Diet'],
+    comments: [
+      {author:'PlantBasedOcean',date:'2026-05-15',text:"I've been fully plant-based for 3 years and the seafood alternatives have improved more in the last 12 months than the previous 5 years. The Revo salmon is a game-changer."},
+      {author:'SeafoodSkeptic',date:'2026-05-16',text:"I tried plant-based tuna once and it was... not great. Maybe I got the wrong brand? What's the best one you've found for sandwiches?"},
+      {author:'SustainableChef_Mia',date:'2026-05-16',text:"For sandwiches, BettaF!sh TU-NAH mixed with vegan mayo and a bit of nori powder is the closest I've gotten. The key is adding seaweed — it gives that ocean-y flavor that most plant-based seafood is missing."},
+      {author:'FishermansDaughter',date:'2026-05-17',text:"I appreciate the sustainability angle but I also want to mention — there are small-scale fisheries that are genuinely sustainable. I buy direct from local fishermen who use hook-and-line methods. Not all fishing is industrial destruction."},
+      {author:'SustainableChef_Mia',date:'2026-05-17',text:"That's a really important point! Small-scale artisanal fishing is completely different from industrial trawlers. I should have been clearer — it's industrial overfishing that's the problem, not all fishing."},
+    ]
+  },
+  {
+    id: 7, author: 'SurferGirl_SD', date: '2026-05-12', likes: 63, reposts: 18, image: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&q=80',
+    title: "Surfed at 6am and the water was glowing — bioluminescence season is here",
+    content: "I've been surfing for 15 years and nothing, and I mean NOTHING, compares to paddling out at dawn and seeing your wake light up electric blue. Bioluminescence season has started early this year where I am, and it's been spectacular.\n\nThe glow comes from dinoflagellates — microscopic plankton that emit light when disturbed. It's a defense mechanism, and it looks like something out of Avatar.\n\nBest conditions for seeing bioluminescence:\n- Warm water (above 20°C generally)\n- Dark nights (new moon is best)\n- Calm seas (rough water disperses the plankton)\n- Areas with high nutrient content\n\nI know some of the most famous spots — Mosquito Bay in Puerto Rico, the Maldives, Vaadhoo Island. But honestly, you don't need to travel that far. I've seen beautiful displays in Southern California, Thailand, Mexico, and even along the Mediterranean coast.\n\nHas anyone else seen it this year? Drop your locations below — I'm building a bioluminescence spotting map!\n\n(btw — it's completely safe to swim in. The plankton don't sting. Just don't drink the water obviously 😅)",
+    tags: ['Lifestyle','Surfing','Ocean Experience'],
+    comments: [
+      {author:'NightDiver_PH',date:'2026-05-12',text:"I saw it while night diving in the Philippines last month. Turned off my dive light and just waved my hands — it was like casting spells underwater. Pure magic."},
+      {author:'KayaKer_Tom',date:'2026-05-13',text:"Kayaked through a bioluminescent bay in Vieques, Puerto Rico a few years ago. Every paddle stroke left a trail of blue sparks. It felt like kayaking through the night sky."},
+      {author:'SurferGirl_SD',date:'2026-05-13',text:"'Casting spells underwater' is the perfect description! That's exactly what it feels like. I'm adding the Philippines to my bucket list."},
+      {author:'BeachRunner_MX',date:'2026-05-14',text:"We get amazing bioluminescence along the Oaxaca coast around October-November. There's a beach called Manzanillo near Puerto Escondido where the waves glow so bright you can read by them. Not even exaggerating."},
+      {author:'MarineBioStudent',date:'2026-05-14',text:"Fun fact: scientists are using bioluminescent plankton for water quality monitoring. Changes in their glow patterns can indicate pollution or temperature changes before we'd detect them otherwise. Nature's early warning system!"},
+      {author:'SurferGirl_SD',date:'2026-05-15',text:"Whoa, that's fascinating about the water quality monitoring! I had no idea. These little creatures just keep getting more amazing."},
+    ]
+  },
+  {
+    id: 8, author: 'MicroplasticsResearcher', date: '2026-05-08', likes: 55, reposts: 22, image: null,
+    title: "Microplastics found in human brain, liver, placenta — EPA finally takes action",
+    content: "I research microplastics for a living, and 2026 has been a watershed year for both scientific discovery and policy action.\n\nHere's what we now know: microplastics have been detected in at least 15 different human organs and fluids — brain, blood, liver (4.6 particles/g), colon (28.1 particles/g — the highest), lungs, placenta, breast milk, and even in carotid artery plaque where they're linked to higher cardiovascular event risk.\n\nA February 2025 Nature Medicine study detecting microplastics in post-mortem brain tissue was the wake-up call that finally got mainstream attention.\n\nThe good news: EPA added microplastics to the Contaminant Candidate List in April 2026 — the first step toward enforceable drinking water standards. HHS announced a $144 million initiative to measure microplastics in humans and develop removal strategies.\n\nPractical steps anyone can take TODAY:\n1. Never microwave food in plastic — even 'microwave-safe' containers shed particles\n2. Filter your tap water (reverse osmosis removes up to 99.9%)\n3. Avoid bottled water — it has 4-6x more microplastics than tap\n4. Switch to glass or stainless steel containers for hot foods\n5. Wash synthetic clothes in cold water with a microfiber filter bag\n\nI'm not saying we should panic — the science on actual disease causation is still developing. But reducing unnecessary exposure is just common sense at this point.\n\nWhat changes have you made in your daily life to reduce microplastic exposure?",
+    tags: ['Health','Microplastics','Policy','Lifestyle'],
+    comments: [
+      {author:'NewMom_Worried',date:'2026-05-08',text:"Reading about microplastics in breast milk was genuinely scary as a new mother. I've switched all our baby bottles to glass and stopped using plastic food containers entirely. Better safe than sorry."},
+      {author:'ScienceTeacher_CA',date:'2026-05-09',text:"I did a classroom demonstration where we filtered tap water vs bottled water and looked at the residue under a microscope. My students were horrified. At least 5 of them convinced their families to switch to filtered tap."},
+      {author:'HealthNut_Mike',date:'2026-05-09',text:"Reverse osmosis systems are more affordable than people think — you can get an under-sink unit for $150-300. Given the alternatives, it's worth every penny."},
+      {author:'MicroplasticsResearcher',date:'2026-05-10',text:"The bottled water finding is one of those ironic things — people buy bottled water thinking it's 'cleaner' but it's actually significantly worse for microplastic contamination."},
+      {author:'SkepticalSam',date:'2026-05-10',text:"Honest question: is there actual evidence these particles cause disease in humans, or is this all correlation? Not trying to be dismissive, just want to understand the science."},
+      {author:'MicroplasticsResearcher',date:'2026-05-10',text:"Fair question. The strongest evidence for harm is from lab/cellular studies — oxidative stress, inflammation, DNA damage, endocrine disruption. Human evidence is mostly observational correlations right now. We need long-term dose-response studies still. But the biological plausibility is strong enough that I personally take precautions."},
+      {author:'ZeroWasteFamily',date:'2026-05-11',text:"We started a 'plastic-free kitchen' challenge this year. Hardest things to replace: cooking oil bottles (almost all plastic), spice containers, and pasta storage. Would love tips from anyone who's gone fully plastic-free in the kitchen!"},
+    ]
+  },
+  {
+    id: 9, author: 'IslandPhotographer', date: '2026-05-05', likes: 71, reposts: 24, image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80',
+    title: "Underwater photography tips for beginners — what I learned in my first year",
+    content: "Started underwater photography 12 months ago with a basic GoPro and a $40 waterproof housing. One year and about 200 dives later, here's what I learned:\n\nGEAR (don't overspend at first):\n- Start with a GoPro or a compact camera with housing. Your phone in a waterproof case can also work for shallow water!\n- The lighting is more important than the camera. A basic video light ($50-80) makes a bigger difference than a $2000 camera body\n- Learn to control your buoyancy before investing in expensive gear. Best camera in the world won't help if you can't stay still\n\nTECHNIQUE:\n- Get close, then get closer. Water reduces contrast and color, so you need to be within 1-2 meters of your subject\n- Shoot upward when possible. Subjects look better with light coming from above\n- The golden hour exists underwater too! Early morning light penetrates water at the best angle\n- Patience beats everything. I've spent 20 minutes waiting for a fish to turn the right way\n\nLOCATIONS (budget-friendly for beginners):\n- Bonaire: shore diving means no boat costs, incredible macro life\n- Koh Tao, Thailand: cheap certification + great viz + whale sharks (seasonal)\n- Red Sea (Marsa Alam): house reef diving from shore, amazing coral walls\n\nBut honestly? The best location is wherever you can dive most often. Consistency > exotic locations.\n\nDrop your own tips below! I'm especially curious about macro photography tricks — that's my next challenge.",
+    tags: ['Lifestyle','Photography','Diving'],
+    comments: [
+      {author:'DiveMaster_Lee',date:'2026-05-05',text:"Great advice. I'd add: learn to freedive. Bubbles from scuba tanks scare fish away and ruin shots. Even a basic level 1 freediving cert will dramatically improve your photos."},
+      {author:'IslandPhotographer',date:'2026-05-05',text:"That's actually next on my list! I've noticed fish are way more comfortable around freedivers. How long did it take you to get comfortable enough for photography?"},
+      {author:'DiveMaster_Lee',date:'2026-05-06',text:"About 3 months of regular practice to hit a comfortable 2-minute breath hold at 10-15m depth. But even 45 seconds at 5m is enough for great shots. The key is relaxation, not lung capacity."},
+      {author:'NightDiver_PH',date:'2026-05-06',text:"For macro: get a +10 diopter wet lens. It's a cheap add-on that lets you focus super close. Nudibranch photography is basically a whole subculture within diving — highly addictive."},
+      {author:'BonaireLocal',date:'2026-05-07',text:"Can confirm Bonaire is incredible for beginners. 80+ shore dive sites, crystal clear water, and the whole coastline is a marine park. You can literally walk in from your hotel."},
+      {author:'IslandPhotographer',date:'2026-05-07',text:"A +10 diopter, got it. Nudibranchs are basically the Pokémon of diving — gotta photograph them all! 😆"},
+    ]
+  },
+  {
+    id: 10, author: 'RenewableOcean', date: '2026-05-01', likes: 31, reposts: 6, image: null,
+    title: "Offshore wind meets marine conservation — can they coexist?",
+    content: "There's been a lot of debate about offshore wind farms and their impact on marine ecosystems. I've been reading the latest environmental impact assessments and the results are more nuanced than either side admits.\n\nThe concerns are real: construction noise can disturb marine mammals, turbine foundations change local currents, and electromagnetic fields from cables may affect species that use magnetic navigation.\n\nBut the data also shows some surprising benefits: turbine foundations act as artificial reefs, increasing local biodiversity. In some North Sea wind farms, fish populations have increased 4-6x compared to nearby sandy seabeds. Some projects are now being designed with 'eco-enhancement' features — textured surfaces for coral settlement, fish hotels, even oyster restoration on turbine bases.\n\nThe key is smart siting. Putting turbines in areas that are already degraded rather than pristine habitats, timing construction to avoid migration/calving seasons, and using noise-reduction technology during pile driving.\n\nI think the conversation needs to shift from 'wind farms good vs. bad' to 'how do we design offshore energy to be net-positive for marine ecosystems?'\n\nHas anyone worked on or studied offshore wind projects? Would love to hear from people with direct experience.",
+    tags: ['Renewable Energy','Policy','Technology'],
+    comments: [
+      {author:'WindEngineer_DK',date:'2026-05-01',text:"I work on offshore wind in Denmark. The artificial reef effect is real — we've documented it extensively at Horns Rev. But it's also true that pile driving during construction is extremely disruptive. We use bubble curtains to reduce noise by 10-15dB and that helps a lot."},
+      {author:'MarineBioStudent',date:'2026-05-02',text:"The Netherlands is doing interesting work on 'nature-inclusive design' for wind farms. They're adding oyster reefs and rock structures around turbine bases. Basically turning energy infrastructure into marine habitat."},
+      {author:'FishermansDaughter',date:'2026-05-02',text:"My dad's a fisherman and wind farms have actually been good for his business — he can't trawl inside the turbine fields, so fish populations there act as de facto reserves that spill over into surrounding fishing grounds."},
+      {author:'SkepticalMarine',date:'2026-05-03',text:"Good discussion. I'd add that floating offshore wind (vs fixed-bottom) has much less seabed disturbance during installation. The technology is maturing fast and should be the default for deeper waters."},
+    ]
+  },
+  {
+    id: 11, author: 'NatureMom_Lisa', date: '2026-04-28', likes: 45, reposts: 14, image: null,
+    title: "Took my kids tidepooling for the first time — best $0 family activity ever",
+    content: "If you have kids and live anywhere near the coast, please take them tidepooling. It costs literally nothing, requires zero special equipment (maybe rubber boots), and my 5 and 8-year-olds were more engaged than I've ever seen them with any screen.\n\nWe went to a rocky shore during low tide (check your local tide charts!) and spent three hours discovering:\n- Tiny hermit crabs trading shells\n- Sea anemones that close up when you gently touch them\n- Starfish clinging to rocks (don't pull them off!)\n- Little fish trapped in pools waiting for the tide to return\n- Different types of seaweed — my daughter now knows the difference between bladderwrack and kelp\n\nTIPS for tidepooling with kids:\n1. Wear shoes with good grip (rocks are slippery!)\n2. Bring a field guide or use iNaturalist app to ID creatures\n3. NEVER take animals home — they'll die\n4. Step carefully — there's life everywhere, even where you don't see it\n5. Flip rocks gently and put them back exactly as they were\n6. Go with the 'look but don't touch much' approach\n\nTeaching kids to love the ocean is the best conservation investment we can make. If they don't love it, they won't protect it.\n\nWhere's your favorite tidepool spot?",
+    tags: ['Lifestyle','Education','Ocean Experience'],
+    comments: [
+      {author:'TeacherByTheSea',date:'2026-04-28',text:"I'm a marine educator and this post makes me so happy! iNaturalist is wonderful for kids — the gamification of species ID is brilliant. My students compete to see who can log the most observations."},
+      {author:'PNW_Explorer',date:'2026-04-29',text:"The Oregon coast has incredible tide pools. Haystack Rock at Cannon Beach is popular for good reason, but I prefer the quieter spots around Yachats. Just check the tide tables — timing is everything."},
+      {author:'NatureMom_Lisa',date:'2026-04-29',text:"iNaturalist has been a game-changer for us! My 8-year-old now has a 'life list' of marine creatures he's spotted. Currently at 47 species. The competitive aspect totally motivates him."},
+      {author:'AussieBeachMum',date:'2026-04-30',text:"We tidepool all the time in Sydney. The rock platforms at Long Reef are amazing. My tip: bring a small white bucket to create a temporary 'viewing tank' — kids can observe creatures up close before releasing them back."},
+      {author:'NatureMom_Lisa',date:'2026-04-30',text:"The white bucket idea is genius! Definitely doing that next time. And I'm adding Oregon to our travel list — we're on the East Coast so it's a different ecosystem entirely."},
+    ]
+  },
+  {
+    id: 12, author: 'GhostNetHunter', date: '2026-04-25', likes: 39, reposts: 10, image: null,
+    title: "We recovered 2.5 tons of ghost nets from a single reef — the scale of this problem is insane",
+    content: "Spent last weekend with a volunteer dive team removing abandoned fishing gear (ghost nets) from a reef about 5km offshore. In two days, we pulled up 2.5 TONS of nets, lines, and traps.\n\nGhost nets are one of the most destructive forms of ocean pollution that nobody talks about. Unlike plastic bottles that just float around, ghost nets keep fishing — they drift for years or decades, entangling and killing everything from turtles to whales to sharks. They also smother coral reefs, blocking sunlight and physically scraping the reef structure.\n\nThe global estimate is that ghost gear makes up about 10% of all marine plastic by weight, but it's disproportionately deadly. A single abandoned gillnet can kill thousands of fish, hundreds of seabirds, and dozens of marine mammals over its 'ghost fishing' lifetime.\n\nWhat can you do?\n- Support organizations like Healthy Seas and Ghost Diving that do retrieval work\n- If you fish, NEVER abandon gear. Report lost gear to local authorities\n- The Global Ghost Gear Initiative (GGGI) has an app where you can report sightings\n- Volunteer with local dive cleanups — many dive shops organize them\n\nAnyone else done ghost gear retrieval? The feeling of cutting a trapped turtle free from a net is something I'll never forget.",
+    tags: ['Ocean Cleanup','Ghost Nets','Fishing','Citizen Science'],
+    comments: [
+      {author:'ScubaVolunteer_FL',date:'2026-04-25',text:"I've done ghost net recovery in the Florida Keys. The worst I've seen: a net wrapped around a coral head with three dead sea turtles tangled in it. They'd clearly been there for months. Haunting."},
+      {author:'Fisherman_Reformed',date:'2026-04-26',text:"As someone who used to fish commercially — I want to push back slightly. Most fishermen don't intentionally abandon gear. Nets get lost in storms, snagged on unknown obstructions, or cut by passing ships. The solution needs to include better gear marking/tracking tech, not just blame."},
+      {author:'GhostNetHunter',date:'2026-04-26',text:"You're absolutely right — I didn't mean to imply fishermen are deliberately dumping gear. Most loss is accidental. GPS-marked gear and retrieval programs would help a lot. Thanks for the important perspective."},
+      {author:'HealthySeasVol',date:'2026-04-27',text:"Healthy Seas works with Ghost Diving to recover nets and then recycle them into ECONYL regenerated nylon. Circular economy in action! Over 800 tons recovered so far. The recycling angle is important because it creates economic incentive for retrieval."},
+    ]
+  },
+  {
+    id: 13, author: 'OceanTeacher_Kate', date: '2026-04-20', likes: 33, reposts: 8, image: null,
+    title: "My students (age 10) designed their own ocean monitoring sensors — and they actually work!",
+    content: "I teach 5th grade science and this semester we did an ocean-themed STEM project that I need to share because the results exceeded all expectations.\n\nThe challenge: design a simple water quality sensor using Arduino boards and basic components. Budget: $15 per group. The kids worked in teams of 3-4 over 6 weeks.\n\nWhat they built:\n- A turbidity (water clarity) sensor using an LED and photoresistor — costs about $3 in parts and actually gives useful readings!\n- A temperature probe with Bluetooth data logging\n- A 'microplastic catcher' — basically a fine mesh filter with a flow meter\n\nWe tested them in a local creek that flows into the ocean, and three groups actually got meaningful data. One group's turbidity sensor detected a spike after a rainstorm (runoff!) just like a professional monitoring station would.\n\nThe best part: these kids now talk about 'water quality' and 'pollution monitoring' like it's completely normal. Several have said they want to be marine scientists. All from a $15 budget and some Arduino boards.\n\nIf you're a teacher or a parent, I highly recommend checking out:\n- PublicLab.org for DIY environmental sensor plans\n- NOAA's Data in the Classroom resources\n- Arduino's 'Science Kit' for simple water experiments\n\nWe need the next generation of ocean guardians. Sometimes all it takes is a $3 sensor and a teacher who cares.",
+    tags: ['Education','Citizen Science','Technology','Lifestyle'],
+    comments: [
+      {author:'STEM_Dad',date:'2026-04-20',text:"This is incredible! I build Arduino projects with my son and I never thought of doing water quality sensors. Do you have the build instructions posted anywhere? Would love to try this at home."},
+      {author:'OceanTeacher_Kate',date:'2026-04-20',text:"I'll be posting the full lesson plan and build guides on my blog next month! In the meantime, the PublicLab turbidity sensor tutorial is a great starting point."},
+      {author:'MarineBioStudent',date:'2026-04-21',text:"I love this so much. I wish my elementary school had done projects like this. It would have accelerated my career path by years."},
+      {author:'TeacherByTheSea',date:'2026-04-21',text:"Stealing this idea for my marine science elective next year! The turbidity-after-rainstorm finding is such a perfect teaching moment about runoff pollution. Kids will remember that forever."},
+      {author:'FishingDad_JT',date:'2026-04-22',text:"My daughter came home talking about this project and now she wants to test the water quality at every fishing spot we go to. Proud dad moment."},
+    ]
+  },
+  {
+    id: 14, author: 'MPA_Explorer', date: '2026-04-17', likes: 27, reposts: 5, image: null,
+    title: "Visited 5 Marine Protected Areas in Southeast Asia — here's what works (and what doesn't)",
+    content: "Just returned from a 3-month trip visiting Marine Protected Areas (MPAs) across Southeast Asia. I wanted to understand what makes an MPA actually effective vs just a 'paper park' (designated on paper but not enforced in reality).\n\nHere's my ranking and why:\n\n🥇 Tubbataha Reefs, Philippines — World class. Only accessible 3 months a year, strict no-take zone, ranger station on-site 24/7. Fish biomass is 4-6x higher than surrounding areas. This is the gold standard.\n\n🥈 Raja Ampat, Indonesia — Incredible biodiversity but enforcement is patchy. Some zones are well-protected, others are heavily fished. The community patrol system (locally called 'sasi') works better than government enforcement.\n\n🥉 Wakatobi, Indonesia — Good example of co-management. Local communities have traditional management rights and it shows. Coral cover is visibly healthier than nearby unprotected reefs.\n\n4th: Apo Island, Philippines — Small but effective. Community-managed since 1982. One of the oldest MPAs in the region.\n\n5th: Unnamed MPA (keeping it anonymous) — Paper park. No enforcement, no rangers, local communities weren't consulted during designation. Fish populations no different from unprotected areas.\n\nThe lesson: MPAs work when local communities are involved in management and there's actual enforcement capacity. A fancy designation means nothing without boots on the ground (or fins in the water).",
+    tags: ['Marine Life','Policy','Lifestyle','Conservation'],
+    comments: [
+      {author:'DiveMaster_Lee',date:'2026-04-17',text:"Tubbataha is unreal. I've done 5 trips there and every time I'm blown away by the fish biomass. It's what the ocean should look like everywhere."},
+      {author:'PolicyNerd',date:'2026-04-18',text:"The 'paper park' problem is so real. An estimated 30-50% of designated MPAs globally have no effective management. We need to shift focus from quantity (km² protected) to quality (actual conservation outcomes)."},
+      {author:'IndonesianDiver',date:'2026-04-18',text:"Raja Ampat has gotten so much better in recent years. The community patrol system has expanded a lot. It's not perfect but the trajectory is positive. And the biodiversity there is literally the highest on Earth for marine life."},
+      {author:'MPA_Explorer',date:'2026-04-19',text:"Good point about quality over quantity. The 30x30 target (protecting 30% of ocean by 2030) is great, but if we rush to meet it with paper parks, we haven't actually achieved anything meaningful."},
+    ]
+  },
+  {
+    id: 15, author: 'GreenBlueTech', date: '2026-04-12', likes: 22, reposts: 4, image: null,
+    title: "Ocean carbon removal startups are taking off — but should they?",
+    content: "There's a wave of ocean-based carbon removal (CDR) startups raising major funding right now: Equatic, Running Tide, Captura, Ebb Carbon, and Planetary Technologies are all working on different approaches to use the ocean to capture CO2 from the atmosphere.\n\nBrief breakdown of the main approaches:\n- Ocean Alkalinity Enhancement: Adding minerals to seawater to increase its CO2 absorption capacity\n- Macroalgae (kelp) cultivation and sinking: Grow kelp, sink it to the deep ocean\n- Electrochemical CDR: Using electricity to extract CO2 from seawater\n\nThe combined funding for these startups is now in the hundreds of millions. But the science is still very unsettled.\n\nQuestions I have:\n- What happens to deep-sea ecosystems when you suddenly dump millions of tons of kelp on them?\n- Can we actually measure and verify how much carbon is being sequestered?\n- Who regulates this? There's no global framework for ocean CDR\n\nI'm cautiously interested but worried we're rushing into ocean-based geoengineering without adequate safeguards. The ocean has already absorbed 90% of excess heat from climate change — we shouldn't treat it as a dumping ground for our carbon problem too.\n\nWhat do people think? Exciting innovation or dangerous distraction?",
+    tags: ['Climate','Technology','Policy'],
+    comments: [
+      {author:'ClimatePolicy_Jeff',date:'2026-04-12',text:"The monitoring and verification challenge is enormous. Carbon in the ocean moves around. How do you prove that a specific amount of CO2 was permanently sequestered? Without credible MRV, carbon credits from these projects are meaningless."},
+      {author:'OceanEngineer_SF',date:'2026-04-13',text:"I work at one of these startups. We're very aware of the concerns and do extensive environmental monitoring. But I agree the regulatory gap is real — we need a clear framework for what's acceptable and what isn't."},
+      {author:'SkepticalMarine',date:'2026-04-13',text:"Dangerous distraction. We already have proven carbon removal technology: it's called forests, wetlands, and seagrass meadows. Invest in protecting and restoring those instead of experimenting on the ocean."},
+      {author:'GreenBlueTech',date:'2026-04-14',text:"I'm somewhere in the middle. I think small-scale, carefully monitored pilots make sense. But the 'move fast and break things' Silicon Valley mentality applied to the ocean terrifies me."},
+    ]
+  },
+  {
+    id: 16, author: 'Thalassophile_Ada', date: '2026-04-08', likes: 89, reposts: 27, image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80',
+    title: "How I quit my tech job to become a marine conservation volunteer — one year later",
+    content: "Exactly one year ago I left my software engineering job in San Francisco to volunteer full-time with marine conservation organizations. I had savings, a one-way ticket to Southeast Asia, and zero plan beyond 'I want to help the ocean.'\n\nHere's the honest reality after 12 months:\n\nTHE GOOD:\n- I've participated in coral restoration in Bali, sea turtle monitoring in Costa Rica, and beach cleanups across 7 countries\n- Learned to dive (now Rescue Diver certified)\n- Met the most passionate community of people I've ever known\n- My eco-anxiety is dramatically lower — taking action beats doom-scrolling every time\n- Skills from my old career (data analysis, programming) are surprisingly useful in conservation\n\nTHE HARD:\n- Savings drain fast. Most volunteer positions don't pay\n- Conservation burnout is real. Progress is slow and setbacks are constant\n- Being away from family and friends is tough\n- Some 'volunteer' programs are exploitative (charging high fees for unskilled labor)\n- You see a lot of destroyed ecosystems and it can be emotionally heavy\n\nMY ADVICE:\n- Start part-time/local before going full-time\n- Vet organizations carefully — look for ones that employ local staff and have measurable impact\n- Your professional skills are probably more valuable to conservation orgs than your manual labor\n- You don't need to quit your job to make a difference\n\nI'm not going back to tech anytime soon, but I also don't romanticize this path. Conservation needs all types — volunteers, donors, advocates, scientists, and also people with normal jobs who just care and act locally.\n\nHappy to answer questions about the transition!",
+    tags: ['Lifestyle','Conservation','Career Change','Ocean Experience'],
+    comments: [
+      {author:'BurnedOutEngineer',date:'2026-04-08',text:"This post hit me hard. I'm a software engineer who's been daydreaming about doing exactly this for years. Thank you for the honest, non-romanticized perspective."},
+      {author:'Thalassophile_Ada',date:'2026-04-08',text:"Message me if you want to chat! The conservation world needs tech talent desperately. You might not need to choose between your career and the ocean — there are ways to combine them."},
+      {author:'ReefDiver88',date:'2026-04-09',text:"The point about vetting organizations is so important. I did a 'volunteer' program in Thailand that was basically $2000 for what amounted to a diving holiday. There are genuine programs out there but you need to do your homework."},
+      {author:'DoctorByTheSea',date:'2026-04-09',text:"As a physician who volunteers with Ocean Conservancy on weekends, your point about starting part-time is spot on. You don't need to make it all-or-nothing."},
+      {author:'Thalassophile_Ada',date:'2026-04-10',text:"Good programs to look into (from my experience): Reef Check, CoralWatch, SeaKeepers, and locally-run organizations that employ community members. Avoid anything that charges over $500/week — the money is going to profit, not conservation."},
+      {author:'HopeFloats',date:'2026-04-10',text:"'Taking action beats doom-scrolling every time' — I needed to hear this today. Thank you."},
+      {author:'BurnedOutEngineer',date:'2026-04-11',text:"After reading this and sleeping on it, I've decided to start volunteering locally on weekends first. Thanks for the push. Baby steps."},
+    ]
+  },
+  {
+    id: 17, author: 'SeaweedFarmer_Joe', date: '2026-04-05', likes: 36, reposts: 9, image: null,
+    title: "I run a small seaweed farm — here's why it's the most sustainable food on Earth",
+    content: "I've been running a small kelp farm off the coast of Maine for three years now. Every day I'm amazed by how this plant can help solve so many environmental problems simultaneously.\n\nSeaweed requires: zero fresh water, zero fertilizer, zero pesticides, zero land. It grows up to half a meter PER DAY (giant kelp). Absorbs 20x more CO2 per acre than land forests. Provides habitat for fish and invertebrates. Filters excess nitrogen and phosphorus from agricultural runoff. And it's incredibly nutritious — packed with protein, iodine, omega-3s, and minerals.\n\nWe sell to local restaurants, a seaweed snack company, and a biostimulant manufacturer (seaweed extract helps crops grow with less fertilizer). The whole operation runs on a small boat and some lines in the water.\n\nChallenges: permitting takes forever (took me 14 months to get my license), the harvest season is cold (November-May in Maine), and the market is still developing. But the demand is growing fast — plant-based food companies are discovering seaweed as a functional ingredient.\n\nIf you're looking for a career that's genuinely regenerative (not just 'less bad'), look into seaweed farming. It's one of the few forms of food production that actively heals the environment.\n\nAnyone else in seaweed aquaculture? Would love to connect!",
+    tags: ['Sustainable Food','Ocean Farming','Lifestyle'],
+    comments: [
+      {author:'MaineCoastLocal',date:'2026-04-05',text:"I buy kelp from a farm near Portland for my restaurant. Customers are surprisingly open to it — we do a kelp Caesar salad that's one of our best sellers. The texture takes some getting used to but the flavor is great."},
+      {author:'ClimateOptimist',date:'2026-04-06',text:"I've been saying this for years! Seaweed is criminally underrated as a climate solution. If we farmed just 2% of the ocean for seaweed, we could offset a significant portion of global fisheries emissions AND provide habitat."},
+      {author:'AspiringFarmer',date:'2026-04-06',text:"How much startup capital did you need? I'm interested in starting a small seaweed operation in the Pacific Northwest but the financial side is intimidating."},
+      {author:'SeaweedFarmer_Joe',date:'2026-04-07',text:"I started with about $25,000 — mostly for the boat, lines, and processing equipment. It's not nothing, but it's less than you'd need for any land-based farm. Maine has a good grant program for aquaculture startups — check if your state does too. GreenWave is a great nonprofit that helps new seaweed farmers get started."},
+      {author:'ClimateOptimist',date:'2026-04-07',text:"GreenWave is amazing. Their 'regenerative ocean farming' model — growing kelp alongside shellfish — is being replicated globally. Polyculture is the future of ocean farming."},
+    ]
+  },
+  {
+    id: 18, author: 'SharkWeek_Fan', date: '2026-04-01', likes: 43, reposts: 11, image: 'https://images.unsplash.com/photo-1531303435785-3853ba035cda?w=800&q=80',
+    title: "Everything you think about sharks is wrong — 10 myths debunked",
+    content: "After spending 5 years studying shark behavior and diving with over 20 species, I feel qualified to debunk some persistent myths:\n\nMYTH 1: Sharks are mindless killers\nREALITY: Many species display complex social behavior, curiosity, and even individual personalities. Some species form long-term social bonds.\n\nMYTH 2: Sharks want to eat humans\nREALITY: Humans are not on the shark menu. Most 'attacks' are exploratory bites (they investigate with their mouths, like we use hands). Sharks don't recognize humans as prey — we're too bony compared to their preferred fatty prey like seals.\n\nMYTH 3: All sharks must keep swimming to breathe\nREALITY: Many species (nurse sharks, wobbegongs, reef sharks) can pump water over their gills while stationary. I've seen dozens of sharks just chilling on the seafloor.\n\nMYTH 4: Sharks are apex predators that can be removed without consequence\nREALITY: On coral reefs, the removal of sharks causes trophic cascades — mid-level predators multiply, their prey (algae-eating fish) decline, and algae overgrows coral. The whole ecosystem unravels.\n\nMYTH 5: Shark fin soup is a tradition we should respect\nREALITY: It became popular only in the last ~100 years among wealthy elites. It's not an ancient tradition, and the practice of finning (cutting off fins and discarding the live shark) is banned in most countries.\n\n5 more myths in the comments because this is getting long! What shark myths have you encountered?",
+    tags: ['Marine Life','Sharks','Education'],
+    comments: [
+      {author:'SharkAdvocate',date:'2026-04-01',text:"MYTH 6: Sharks aren't important. REALITY: They've been around for 400+ million years and are critical to ocean health. They're not just predators — they're ecosystem engineers."},
+      {author:'SharkWeek_Fan',date:'2026-04-01',text:"Perfect! MYTH 7: You're more likely to be killed by a shark than by... REALITY: You're more likely to be killed by a vending machine, a falling coconut, or a selfie than by a shark. About 5 fatal shark attacks globally per year vs. hundreds of millions of beach visits."},
+      {author:'DiveMaster_Lee',date:'2026-04-02',text:"MYTH 8: Sharks are solitary. Many species, like scalloped hammerheads, form schools of hundreds. Others, like lemon sharks, have been shown to have 'friends' — preferred social partners they spend time with."},
+      {author:'SharkWeek_Fan',date:'2026-04-02',text:"MYTH 9: All sharks are big. 80% of shark species are under 1.5 meters. The dwarf lanternshark is only 20cm long! And MYTH 10: Sharks are dangerous to divers. I've had hundreds of encounters and the shark always swims away first. They're cautious, curious, and way more afraid of us than we are of them."},
+      {author:'BeachLover_FL',date:'2026-04-03',text:"This thread is amazing. I used to be terrified of sharks (thanks, Jaws) but learning about them has completely changed my perspective. Now I get excited when I see one while snorkeling."},
+      {author:'SharkAdvocate',date:'2026-04-03',text:"Jaws caused so much damage to shark conservation. Peter Benchley (the author) spent the rest of his life advocating for shark protection because he felt so guilty about the fear he created."},
+    ]
+  },
+  {
+    id: 19, author: 'PacificSailor', date: '2026-03-28', likes: 56, reposts: 16, image: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80',
+    title: "Sailing across the Pacific — what 40 days at sea teaches you about the ocean",
+    content: "Completed a 40-day sail from California to French Polynesia last month. It was my first ocean crossing, and the experience reshaped how I think about the ocean.\n\nDAYS 1-5: The coast fades and you realize how tiny you are. A pod of 100+ dolphins escorted us for hours on day 3. They were surfing the bow wave and looking up at us. I'm not spiritual, but that was a religious experience.\n\nDAYS 6-15: The deep blue is impossibly blue. You're sailing over 4-5km of water. At night, the stars are overwhelming — zero light pollution, and the Milky Way casts a shadow. Phosphorescent wake every night. Flying fish on deck every morning.\n\nDAYS 16-25: The trash. Even 1000+ miles from land, we saw plastic. A floating crate. A fishing buoy. Countless tiny fragments. The ocean connects everything — what we throw 'away' on land ends up here.\n\nDAYS 26-35: You develop a rhythm. Watch shifts, reading, fishing (we caught 3 tuna — fed us for days), maintaining the boat. The ocean becomes your world. Land feels like a dream.\n\nDAYS 36-40: Land ho. The smell of earth reaches you before you see anything. Tahiti's peaks emerging from the clouds is something I'll remember forever.\n\nWhat I learned: the ocean is simultaneously incredibly powerful and incredibly fragile. It sustained us for 40 days — food, beauty, wonder. But it's also a mirror reflecting our carelessness back at us.\n\nAnyone else done a long ocean crossing?",
+    tags: ['Lifestyle','Sailing','Ocean Experience'],
+    comments: [
+      {author:'SailorSam',date:'2026-03-28',text:"Welcome to the club! I've done three Pacific crossings and your description is spot-on. The plastic in the garbage patch is the most depressing part — it's not a visible island of trash, it's more like a smog of micro-particles. Subtle but everywhere."},
+      {author:'PacificSailor',date:'2026-03-29',text:"Exactly — I was expecting a 'garbage island' and instead it's more insidious. Just constant small fragments. It's almost worse because you can't unsee it once you notice it."},
+      {author:'LandlubberDreamer',date:'2026-03-29',text:"This is my dream trip. How much sailing experience did you have before attempting a Pacific crossing? And what size boat?"},
+      {author:'PacificSailor',date:'2026-03-30',text:"I had about 5 years of coastal sailing experience before this. 42-foot catamaran. Most people recommend at least 2-3 years of experience plus some offshore passages before attempting a crossing. Crew experience matters more than yours as skipper, honestly — find people who've done it before."},
+      {author:'SailorSam',date:'2026-03-30',text:"Pro tip: bring more fishing gear than you think you need. We lost 3 lures to big tuna and were rationing instant noodles by week 5. The ocean provides but it also takes 😂"},
+    ]
+  },
+  {
+    id: 20, author: 'OceanPolicyWatch', date: '2026-03-23', likes: 19, reposts: 3, image: null,
+    title: "30x30 ocean protection goal — are we on track for 2030?",
+    content: "The Kunming-Montreal Global Biodiversity Framework committed nations to protect 30% of the ocean by 2030. We're now at about 8% protected (and only ~3% in fully or highly protected areas). We'd need to more than triple current protected area in 4 years.\n\nProgress tracker:\n- High seas: BBNJ Treaty entered force Jan 2026 — this gives us the legal tool to create MPAs in international waters, but zero have been created yet\n- National waters: Several countries are making progress (Palau, Chile, UK, Seychelles) but most are far behind\n- Biggest gap: enforcement. Even existing MPAs are under-enforced\n\nAt current pace, we'll hit maybe 15-18% by 2030, not 30%. That's still progress, but it's a missed target.\n\nThe bigger question: should we focus on the 30% number at all? Or should we prioritize making the existing 8% actually effective? A well-enforced 8% might do more for conservation than a paper-only 30%.\n\nThoughts?",
+    tags: ['Policy','MPA','Conservation'],
+    comments: [
+      {author:'PolicyNerd',date:'2026-03-23',text:"Quality over quantity, absolutely. But there's also a political dimension — having the 30% target creates pressure and accountability. Without it, many countries would do nothing at all."},
+      {author:'SkepticalMarine',date:'2026-03-24',text:"I'd add that MPAs need to be in the right places, not just random patches of empty ocean. Biodiversity hotspots, spawning grounds, migration corridors — these are what matter, not just hitting a percentage."},
+      {author:'OceanPolicyWatch',date:'2026-03-24',text:"Good point. There's research showing that protecting the highest-biodiversity 30% of the ocean would yield vastly more conservation benefit than protecting a random 30%. Spatial planning matters enormously."},
+    ]
+  },
+  {
+    id: 21, author: 'TidePoolExplorer', date: '2026-03-18', likes: 37, reposts: 7, image: null,
+    title: "Found a blue-ringed octopus while tidepooling — beautiful but deadly",
+    content: "Was doing my regular weekend tidepooling and spotted the most beautiful creature I've ever seen: a blue-ringed octopus. About the size of a golf ball, with iridescent blue rings that flash when it's agitated.\n\nFor those who don't know: this tiny octopus carries enough venom (tetrodotoxin) to kill 26 adult humans within minutes. There's no antivenom. If you get bitten, you need immediate CPR and mechanical ventilation until the toxin wears off (which can take 24+ hours).\n\nI took photos from a safe distance (3+ meters, telephoto lens) and then backed away slowly. No photo is worth dying for.\n\nThat said, these creatures are NOT aggressive. They only bite when handled or stepped on. Every documented fatality has involved someone picking one up (usually not knowing what it was).\n\nSafety tips if you're tidepooling in Australia/Pacific/Indian Ocean regions:\n- NEVER touch anything you can't identify with 100% certainty\n- Blue-ringed octopuses are found in rock pools from Japan to Australia\n- They're tiny (golf ball to tennis ball size) and well-camouflaged\n- If you see bright blue rings flashing — it's a warning. Back away.\n\nThe ocean is full of wonders, but respect is part of appreciation! Has anyone else encountered dangerous marine life unexpectedly?",
+    tags: ['Lifestyle','Marine Life','Ocean Experience'],
+    comments: [
+      {author:'AussieBeachMum',date:'2026-03-18',text:"Blue-ringed octopuses are surprisingly common in Sydney rock pools! I've seen 3 in the last year. I always tell my kids: 'look with your eyes, not your hands.' They're incredibly beautiful when the rings flash."},
+      {author:'ScubaVolunteer_FL',date:'2026-03-19',text:"We have stonefish here in the Indo-Pacific which are arguably scarier — they're the most venomous fish in the world and look exactly like a rock. You literally don't know they're there until you step on one. Always do the 'shuffle walk' when wading!"},
+      {author:'TidePoolExplorer',date:'2026-03-19',text:"Stonefish terrify me for exactly that reason — you can't see them! At least the blue-ringed octopus warns you with the flashes."},
+      {author:'DiveMaster_Lee',date:'2026-03-20',text:"Most 'dangerous' marine animals want nothing to do with humans. I've been diving for 20 years and the only thing that's ever hurt me is a sea urchin spine (and that was my fault for not paying attention). Respect, don't fear."},
+    ]
+  },
+  {
+    id: 22, author: 'CoastalDefender', date: '2026-03-15', likes: 24, reposts: 4, image: null,
+    title: "Our mangrove restoration project hit 85% survival rate — here's our method",
+    content: "Been working on a mangrove restoration project in Southeast Asia for two years, and we just got our 24-month monitoring results: 85% survival rate across 15,000 planted mangroves. For context, the global average for mangrove restoration projects is around 30-50%.\n\nWhat we did differently:\n\n1. HYDROLOGY FIRST. Most failed projects just plant seedlings and hope. We spent 6 months studying water flow patterns before planting anything. Mangroves need very specific inundation conditions.\n\n2. COMMUNITY CO-MANAGEMENT. The local fishing community manages the site because they have the most at stake. They're paid for planting and monitoring time. This isn't charity — it's employment in ecosystem restoration.\n\n3. DIVERSE SPECIES. Many projects plant a single species (usually Rhizophora because it's easy). We planted 5 native species matching the natural zonation pattern.\n\n4. NO PLASTIC BAGS. We grow seedlings in biodegradable pots made from coconut husks. The pots decompose and add organic matter.\n\n5. ADAPTIVE MANAGEMENT. We monitor monthly and adjust. Some areas needed replanting with different species. That's normal — restoration isn't a one-and-done activity.\n\nMangroves sequester 3-5x more carbon per hectare than tropical rainforests, protect coastlines from storm surges, and are critical nurseries for fish and shrimp. If you're near a coastline with degraded mangroves, consider volunteering with a restoration project!",
+    tags: ['Restoration','Mangroves','Citizen Science','Climate'],
+    comments: [
+      {author:'ClimatePolicy_Jeff',date:'2026-03-15',text:"85% is seriously impressive. The hydrology point is so underappreciated. I've seen projects where volunteers proudly planted 10,000 seedlings, and 90% died within a year because the site was simply wrong for mangroves."},
+      {author:'CoastalDefender',date:'2026-03-16',text:"That's the tragic thing — well-meaning volunteers wasting time and money on poorly planned projects. The worst is when they feel good about it but have actually achieved nothing. Proper site assessment is everything."},
+      {author:'FishermansDaughter',date:'2026-03-16',text:"The community management angle is key. When local people benefit economically from restoration, it becomes self-sustaining. Outside NGOs come and go, but the community stays."},
+    ]
+  },
+  {
+    id: 23, author: 'Sailor_Scientist', date: '2026-03-10', likes: 18, reposts: 2, image: null,
+    title: "eDNA is revolutionizing how we monitor ocean biodiversity — here's how it works",
+    content: "Environmental DNA (eDNA) is one of the most exciting technologies in marine science right now, and I want to explain why it's such a big deal.\n\nTraditional marine biodiversity surveys: send divers with clipboards to count fish. Slow, expensive, limited to what you can see, requires taxonomic expertise.\n\neDNA method: collect a water sample, filter it, analyze the DNA fragments floating in it. A single liter of seawater contains genetic traces of basically every organism that's been in that water recently — from bacteria to blue whales.\n\nWhat this enables:\n- Detect rare/elusive species without ever seeing them. Whale sharks, dugongs, deep-sea creatures — their presence shows up in water samples\n- Monitor entire ecosystems from a water bottle. One sample can detect hundreds of species simultaneously\n- Early detection of invasive species before they become established\n- Track biodiversity changes over time much faster and cheaper than traditional methods\n\nThe technology still has limitations (can't count individuals, DNA degrades over time, reference databases are incomplete), but it's improving fast. Citizen science projects using eDNA are already emerging — imagine thousands of volunteers collecting water samples from beaches worldwide.\n\nThis is how we scale ocean monitoring from a handful of research stations to a truly global network.",
+    tags: ['Technology','Citizen Science','Marine Biology'],
+    comments: [
+      {author:'CitizenScientist_SG',date:'2026-03-10',text:"I participated in an eDNA sampling event in Singapore last year. All we did was collect water in a special filter bottle. Six weeks later we got an email with a list of 200+ species detected at our sampling site including a dugong that nobody had seen there in years!"},
+      {author:'MarineBioStudent',date:'2026-03-11',text:"eDNA is going to be huge for MPA monitoring. Instead of expensive research cruises, you can do regular biodiversity assessments with relatively cheap water sampling. More data = better management."},
+      {author:'Sailor_Scientist',date:'2026-03-11',text:"The dugong detection is such a perfect example of eDNA's power. Traditional visual surveys would have completely missed it. There are probably so many species 'hiding in plain sight' that eDNA will reveal."},
+    ]
+  },
+  {
+    id: 24, author: 'Mangrove_Mike', date: '2026-03-05', likes: 29, reposts: 6, image: null,
+    title: "One hectare of mangroves stores more carbon than you think — the numbers",
+    content: "I've seen several posts about mangroves recently and wanted to share some actual numbers that highlight why these ecosystems are so important:\n\nCarbon storage (per hectare):\n- Tropical rainforest: ~200-300 tonnes CO2 equivalent\n- Temperate forest: ~150-200 tonnes\n- Mangrove forest: ~1,000-1,500 tonnes (!!)\n- Seagrass meadow: ~500-1,000 tonnes\n- Salt marsh: ~300-900 tonnes\n\nMangroves store 3-5x more carbon than tropical rainforests because most of it is in the soil — deep, anoxic (oxygen-free) mud that can lock carbon away for millennia if undisturbed.\n\nBut here's the tragic part: we've lost 35-50% of the world's mangroves since 1980, mostly to shrimp farming, coastal development, and agriculture. When mangroves are destroyed, that stored carbon is released.\n\nThe economic value of intact mangroves (including fisheries, coastal protection, carbon storage) is estimated at $33,000-57,000 per hectare per year. Shrimp farming generates maybe $1,000-4,000 per hectare. We're literally destroying million-dollar ecosystems to make a few thousand bucks.\n\nIf you want to support mangrove conservation:\n- Mangrove Action Project does amazing restoration work\n- Map of Life has a mangrove monitoring citizen science program\n- Eat sustainable shrimp (look for ASC certification)\n- Donate to Blue Carbon initiatives\n\nAnyone have mangrove restoration stories to share?",
+    tags: ['Climate','Restoration','Blue Carbon','Mangroves'],
+    comments: [
+      {author:'ClimatePolicy_Jeff',date:'2026-03-05',text:"The economic comparison is so powerful. We need to get better at quantifying nature's value in terms that policymakers understand. 'Don't destroy this mangrove' doesn't work. 'This mangrove provides $50K/ha/year in services' gets attention."},
+      {author:'ShrimpFarmer_TH',date:'2026-03-06',text:"I used to run a shrimp farm and I want to add nuance: not all shrimp farming destroys mangroves. Integrated mangrove-shrimp systems (silvofishery) can actually be sustainable. The problem is industrial-scale intensive farming, not traditional methods."},
+      {author:'Mangrove_Mike',date:'2026-03-06',text:"Great point about silvofishery! I should have been more specific. Traditional integrated systems that maintain mangrove cover are fundamentally different from clearing mangroves for intensive ponds. Thanks for the correction."},
+    ]
+  },
+  {
+    id: 25, author: 'WaveEnergy_Enthusiast', date: '2026-02-28', likes: 16, reposts: 2, image: null,
+    title: "Wave energy is finally happening — but will it scale?",
+    content: "Wave energy has been '5 years away' for about 30 years. But 2026 might actually be the turning point.\n\nSeveral developments: the PacWave test site off Oregon has multiple wave energy converters being tested. Eco Wave Power connected a project to the grid in Israel. Mocean Energy's Blue X prototype generated power during North Sea trials. And CorPower Ocean's HiWave-5 device showed promising results in Portugal.\n\nWave energy potential is enormous — theoretically, waves could provide 10-20% of global electricity demand. It's more predictable than solar or wind (waves are created by wind, which is created by the sun, but the ocean stores and transports that energy over days).\n\nThe challenges: saltwater destroys everything, storms are brutal, maintenance is expensive, and the technology is still immature compared to wind/solar. Every wave energy company that's failed (and there have been many) has been killed by the maintenance costs, not the energy generation.\n\nI think wave energy will find its niche — not competing with massive offshore wind farms, but powering remote coastal communities, desalination plants, aquaculture operations, and ocean monitoring systems. The decentralized applications are more promising than utility-scale.\n\nWhat do people think? Will wave energy ever be more than a niche technology?",
+    tags: ['Renewable Energy','Technology'],
+    comments: [
+      {author:'OceanEngineer_SF',date:'2026-02-28',text:"The maintenance challenge is the real killer. I toured the PacWave site last year and the engineers there said the same thing: generating power from waves is solved. Making it survive year after year of North Pacific storms is the hard part."},
+      {author:'ClimateOptimist',date:'2026-03-01',text:"I'm bullish on niche applications. Imagine a network of ocean monitoring buoys that are self-powered by wave energy. Or remote island communities that currently burn diesel for electricity. Those are the use cases where wave energy makes sense, not trying to compete with offshore wind."},
+      {author:'WaveEnergy_Enthusiast',date:'2026-03-01',text:"Exactly! The decentralized use case is way more compelling. Our ocean monitoring networks need power, and running diesel generators on remote buoys is terrible for the environment. Wave-powered sensors could be transformative for data collection."},
+    ]
+  },
+  {
+    id: 26, author: 'DivingDoctor_Anna', date: '2026-02-22', likes: 21, reposts: 3, image: null,
+    title: "The health benefits of being near the ocean — it's not just in your head (well, partly it is)",
+    content: "As a physician and avid diver, I wanted to share some science on why the ocean is genuinely good for your health:\n\nPHYSIOLOGICAL BENEFITS:\n- Negative ions in sea air:海浪产生的负离子可以提高血清素水平，改善情绪\n- Salt water minerals (magnesium, potassium, iodine) are absorbed through skin during swimming\n- Cold water exposure triggers norepinephrine release, which has anti-inflammatory effects\n- The sound of waves reduces cortisol (stress hormone) levels — measurable in blood tests\n- Sunlight = vitamin D synthesis (but wear reef-safe sunscreen!)\n\nPSYCHOLOGICAL BENEFITS:\n- 'Blue space' theory: research consistently shows that being near water reduces stress and improves mental health more than green space (forests/parks)\n- The rhythmic nature of waves induces a meditative state\n- Ocean sounds reduce activity in the brain's default mode network (associated with rumination/anxiety)\n\nA 2024 study from the University of Exeter found that people who live within 1km of the coast report significantly better mental health than those inland, even after controlling for income and exercise levels.\n\nMy prescription: 20 minutes of ocean exposure, 3 times a week. Side effects may include: improved mood, better sleep, and an urge to protect the ocean. 😊\n\nWhy do you think the ocean makes us feel better?",
+    tags: ['Health','Lifestyle','Ocean Experience'],
+    comments: [
+      {author:'BeachRunner_MX',date:'2026-02-22',text:"I started running on the beach instead of the treadmill during COVID and my mental health improved dramatically. I always thought it was just the exercise, but the 'blue space' research makes so much sense."},
+      {author:'HealthNut_Mike',date:'2026-02-23',text:"There's also research on 'awe walks' — short walks where you intentionally look for things that inspire awe. The ocean is basically an awe factory. Sunsets, waves, marine life — constant reminders of something bigger than yourself."},
+      {author:'DivingDoctor_Anna',date:'2026-02-23',text:"'Awe factory' — I'm stealing that! And yes, the research on awe as a psychological intervention is fascinating. It reduces inflammation markers as well as improving mental health."},
+      {author:'NewMom_Worried',date:'2026-02-24',text:"I live 3 hours from the coast but I play ocean sounds at night for my baby. She falls asleep so much faster than with white noise. Maybe there's something innate about it."},
+    ]
+  },
+  {
+    id: 27, author: 'PlasticFreeLife', date: '2026-02-18', likes: 48, reposts: 19, image: null,
+    title: "One year plastic-free(ish) — what worked, what was impossible, and what I learned",
+    content: "A year ago I committed to eliminating single-use plastic from my life. Here's the honest report card after 12 months:\n\nFULLY ELIMINATED (easier than expected):\n✅ Plastic water bottles → stainless steel bottle + tap filter\n✅ Plastic shopping bags → reusable bags (this one is easy, most places charge for bags now)\n✅ Plastic straws → metal straw in my bag (or just... no straw?)\n✅ Plastic wrap → beeswax wraps + glass containers\n✅ Shampoo/soap bottles → solid shampoo bars + bar soap\n✅ Takeout containers → bring my own (restaurants are surprisingly fine with this!)\n✅ Coffee cups → keep cup (most cafes give a discount)\n\nPARTIALLY REDUCED (hard but doable):\n🟡 Plastic food packaging — this is the HARDEST one. Even farmers markets use plastic. I'm at about 50% reduction.\n🟡 Cleaning products — switched to refillable, but the refills come in... more plastic\n🟡 Toilet paper — it's almost impossible to buy TP not wrapped in plastic unless you pay 3x more\n\nNEARLY IMPOSSIBLE:\n❌ Medication packaging\n❌ Electronics and cables\n❌ Basically anything ordered online\n❌ Cheese. Why is ALL cheese in plastic?\n\nLESSONS:\n1. You can't shop your way out of plastic pollution. Individual action matters but systemic change is essential.\n2. The 'zero waste' influencers who fit a year's trash in a mason jar are lying (or not telling you about their medication, electronics, car parts, etc.)\n3. The biggest impact change isn't what you buy — it's how much less you buy overall\n4. Write to companies. I've gotten actual responses from brands about their packaging. Consumer pressure works.\n\nAnyone else trying to reduce plastic? What's been your hardest item to replace?",
+    tags: ['Lifestyle','Plastic Pollution','Sustainable Living'],
+    comments: [
+      {author:'ZeroWasteFamily',date:'2026-02-18',text:"THE CHEESE. I feel this in my soul. I've tried bringing my own container to the deli counter and they look at me like I'm asking them to break the law. It's absurd."},
+      {author:'EcoMom',date:'2026-02-19',text:"Toilet paper wrapped in paper does exist! Who Gives A Crap and Reel both do plastic-free TP delivery. It's more expensive but not 3x more. About 1.5x if you buy in bulk."},
+      {author:'PlasticFreeLife',date:'2026-02-19',text:"Thank you! I'll check those out. At this point I'm willing to pay a premium for anything that doesn't come wrapped in more plastic."},
+      {author:'ScienceTeacher_CA',date:'2026-02-20',text:"The point about not shopping your way out of pollution is so important. We need EPR (Extended Producer Responsibility) laws that make manufacturers responsible for packaging waste. Individual action is necessary but insufficient."},
+      {author:'PlasticFreeLife',date:'2026-02-20',text:"EPR laws are the real solution. In countries with strong EPR, packaging waste has dropped dramatically. In the US and many other countries, the cost of disposal is externalized to taxpayers while manufacturers profit."},
+    ]
+  },
+  {
+    id: 28, author: 'CitizenScientist_SG', date: '2026-02-12', likes: 15, reposts: 2, image: null,
+    title: "CoralWatch — how anyone can help monitor coral bleaching with a color chart",
+    content: "Want to contribute to real coral reef science without being a marine biologist? Check out CoralWatch.\n\nIt's brilliantly simple: they give you a color chart (like paint swatches at a hardware store) with different shades representing coral health. You go diving or snorkeling, find corals, match their color to the chart, and record the data in their app.\n\nLighter = bleached/stressed. Darker = healthy (the color comes from symbiotic algae living in the coral tissue).\n\nOver 250,000 surveys have been submitted from 140+ countries. The data is used by researchers to track bleaching events globally and by reef managers to make management decisions.\n\nWhy this works:\n- Requires zero scientific training — literally just color matching\n- Takes 5 minutes per survey\n- Can be done while snorkeling (you don't need scuba certification)\n- The data is genuinely useful for science\n\nI've done about 50 surveys in the last year. It's added purpose to every reef dive or snorkel trip. Instead of just 'look at pretty fish,' I'm now contributing to a global database that helps protect these ecosystems.\n\nOther citizen science apps I recommend:\n- iNaturalist (species ID)\n- Marine Debris Tracker (trash data)\n- Clean Swell (beach cleanup logging)\n- Eye on the Reef (Great Barrier Reef specific)\n\nAnyone else using these or similar apps?",
+    tags: ['Citizen Science','Coral','Lifestyle'],
+    comments: [
+      {author:'ReefDiver88',date:'2026-02-12',text:"I've been using CoralWatch for 2 years! The color chart is so satisfyingly simple. I laminated mine so it doesn't disintegrate underwater."},
+      {author:'TeacherByTheSea',date:'2026-02-13',text:"I do CoralWatch surveys with my high school marine science class. It's the perfect field activity — simple enough for teenagers, but real enough that they feel like actual scientists."},
+      {author:'CitizenScientist_SG',date:'2026-02-13',text:"The laminating tip is genius. I've gone through three paper charts already. Definitely doing that."},
+    ]
+  },
+  {
+    id: 29, author: 'KelpFarmer_NZ', date: '2026-02-08', likes: 25, reposts: 5, image: null,
+    title: "Why New Zealand's kelp forests are disappearing — and the fight to save them",
+    content: "New Zealand's giant kelp forests (Macrocystis pyrifera) are some of the most productive ecosystems on Earth. They grow up to 50cm per day, provide habitat for hundreds of species, and sequester massive amounts of carbon.\n\nBut they're dying. Large areas of the South Island's east coast have lost 60-80% of their kelp cover in the last decade. The causes are complex:\n\n1. Marine heatwaves: 2017-2018 'Blob' heatwave devastated kelp in multiple regions\n2. Sedimentation from land use changes: runoff smothers kelp and blocks light\n3. Overfishing of predators: removal of snapper and crayfish has caused kina (sea urchin) populations to explode. Kina eat kelp. Too many kina = urchin barrens where nothing else grows.\n\nKina barrens are particularly tragic because they're a direct result of human action AND they're reversible. Where culling of kina has been done (removing them to more natural densities), kelp has grown back within 18 months.\n\nThere are now community-led kina removal programs in several areas, including paying divers to cull kina and selling the roe (uni) to restaurants. Turning an ecological problem into a food product — circular conservation!\n\nAnyone else dealing with urchin barrens or kelp loss in their region?",
+    tags: ['Restoration','Marine Life','Kelp','Lifestyle'],
+    comments: [
+      {author:'DiveMaster_Lee',date:'2026-02-08',text:"California has the same problem with purple urchin barrens. There are now organizations paying divers to remove urchins and the uni is sold to high-end restaurants. It's called 'conservation through consumption' and it's surprisingly effective."},
+      {author:'KelpFarmer_NZ',date:'2026-02-09',text:"The California purple urchin situation is even worse than ours. I've seen photos of barrens that stretch for miles. At least the uni market creates an economic incentive for removal."},
+      {author:'MaineCoastLocal',date:'2026-02-09',text:"Maine's kelp forests are actually doing okay so far (knock on wood), but we're watching the Gulf of Maine warm faster than almost any other ocean region. It feels like a ticking clock."},
+    ]
+  },
+  {
+    id: 30, author: 'HawaiiWaterman', date: '2026-02-01', likes: 68, reposts: 21, image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80',
+    title: "What the ocean taught me about life — reflections from 30 years in the water",
+    content: "I've been surfing, diving, and paddling in these waters for over 30 years. The ocean has been my teacher, my therapist, and my church. Here's what it's taught me:\n\n1. You can't fight the current. The ocean is always stronger than you. You learn to work WITH the forces, not against them. This applies to almost everything in life.\n\n2. Timing is everything. In surfing and in life, the difference between a great ride and getting pounded is often a split second. Patience and timing matter more than effort.\n\n3. The best things happen when you're paying attention. A dolphin pod, a whale breach, a perfect wave — these moments last seconds. If you're distracted, you miss them forever.\n\n4. Respect is earned through showing up. The ocean doesn't care about your credentials, your money, or your Instagram. It responds to consistency, humility, and respect.\n\n5. Everything is connected. I've watched the decline of reefs, the disappearance of species, the warming of waters. What happens on land — agriculture, development, pollution — shows up in the ocean. There is no 'away.'\n\n6. Resilience is built through discomfort. Cold water, big waves, long paddles — each time you push through discomfort, you expand what you're capable of.\n\n7. Humility. The ocean will humble you, repeatedly, and that's a gift. Nothing teaches perspective like being held underwater by a wave and realizing how small you are.\n\nI'm getting older now and can't charge big waves like I used to. But I still paddle out every week. The ocean still teaches. I hope I never stop learning.\n\nWhat has the ocean taught you?",
+    tags: ['Lifestyle','Ocean Experience','Reflection'],
+    comments: [
+      {author:'SurferGirl_SD',date:'2026-02-01',text:"This is beautiful. 'The best things happen when you're paying attention' — this is so true. So many people paddle out with waterproof headphones these days and miss all the magic."},
+      {author:'OldSalt_65',date:'2026-02-02',text:"50 years on the water here. Your point about humility resonates deeply. Every time I think I've mastered the ocean, it finds a new way to humble me. And I'm grateful for it."},
+      {author:'HawaiiWaterman',date:'2026-02-02',text:"50 years! You must have seen so much change. The reefs of my childhood are mostly gone now. I try to share what I remember with younger generations so they know what we're fighting to restore."},
+      {author:'LandlubberDreamer',date:'2026-02-03',text:"I grew up landlocked and only saw the ocean for the first time at age 22. It changed my entire life trajectory. Now I live within walking distance of the beach and can't imagine being anywhere else."},
+      {author:'HawaiiWaterman',date:'2026-02-03',text:"That's a beautiful story. The ocean has a way of calling people home, even if they've never been there before."},
+      {author:'BeachRunner_MX',date:'2026-02-04',text:"#3 hit me. I watched whales breaching during a beach run last month and almost didn't stop running. Caught myself and just sat in the sand watching for 45 minutes. Best 45 minutes of my year."},
+    ]
+  },
+  {
+    id: 31, author: 'OceanDataGeek', date: '2026-01-25', likes: 14, reposts: 2, image: null,
+    title: "Open source ocean data — tools and datasets anyone can use for free",
+    content: "Sharing some incredible free ocean data resources that more people should know about:\n\nSATELLITE DATA:\n- NASA OceanColor: chlorophyll, sea surface temperature, ocean color imagery going back decades\n- Copernicus Marine (EU): currents, waves, biogeochemistry, sea ice — global coverage, free access\n- NOAA CoastWatch: satellite data specifically processed for coastal applications\n\nIN-SITU DATA:\n- Argo floats: 3,800+ autonomous floats measuring temperature/salinity to 2000m depth, updated daily\n- IOOS (US Integrated Ocean Observing System): real-time buoy data, HF radar, glider data\n- OBIS (Ocean Biodiversity Information System): 60+ million species occurrence records\n\nCITIZEN SCIENCE:\n- iNaturalist: marine species observations from users worldwide\n- Marine Debris Tracker: global litter data\n- CoralWatch: bleaching data from volunteer surveys\n\nTOOLS:\n- Python: xarray, cartopy, cmocean libraries for ocean data analysis and visualization\n- R: oce, marmap, rnaturalearth packages\n- QGIS: free GIS software that works great with ocean data\n\nI use these almost daily for my work and they're all genuinely free (not 'free trial' free). The ocean science community is remarkably good about open data.\n\nWhat datasets or tools would you add to this list?",
+    tags: ['Technology','Citizen Science','Data'],
+    comments: [
+      {author:'MarineBioStudent',date:'2026-01-25',text:"Great list! I'd add the Global Fishing Watch dataset — AIS vessel tracking data that lets you see fishing activity globally in near real-time. Incredibly powerful for understanding human pressure on the ocean."},
+      {author:'CitizenScientist_SG',date:'2026-01-26',text:"For beginners, I recommend starting with iNaturalist. It's so intuitive and the community is incredibly helpful with species IDs. You don't need any scientific background to start contributing."},
+    ]
+  },
+  {
+    id: 32, author: 'GreenSailor2025', date: '2026-01-18', likes: 72, reposts: 28, image: null,
+    title: "We sailed around the world for 4 years and documented ocean plastic — AMA",
+    content: "My partner and I just completed a 4-year circumnavigation on our 38-foot sailboat. We visited 32 countries and crossed every major ocean. Along the way, we documented plastic pollution — taking water samples, photographing beaches, and logging what we saw.\n\nKey findings from our journey:\n- We saw plastic on every single beach we visited. Not one beach was free of it. From remote Pacific atolls to Arctic beaches in Svalbard.\n- The worst concentrations weren't where we expected. Southeast Asia and the Caribbean had by far the most visible plastic. But even the 'pristine' places (Cocos Keeling, Pitcairn, the Tuamotus) had significant micro-fragments in the sand.\n- Fishing gear was the most common identifiable item on remote beaches, not consumer packaging. Buoys, nets, lines, crates.\n- The human side: in every country we visited, we found people organizing cleanups. Kids, elders, fishermen, tourists. The fight is happening everywhere.\n\nThe emotional experience was complex — navigating between despair at the scale of the problem and hope from the people working to fix it. The people gave us hope.\n\nWe're now back on land, writing a book about the journey and speaking at schools. Happy to answer any questions about the trip, the boat, the plastic data, or life at sea!\n\nAsk me anything.",
+    tags: ['Lifestyle','Sailing','Plastic Pollution','Ocean Experience'],
+    comments: [
+      {author:'SailorSam',date:'2026-01-18',text:"Amazing journey! Question: what was the most surprising place you visited in terms of either the best-preserved or most-devastated marine environment?"},
+      {author:'GreenSailor2025',date:'2026-01-18',text:"Best preserved: the Tuamotu atolls in French Polynesia. Still relatively healthy coral, clear water, abundant fish. Most devastated: we anchored off a beach in the Dominican Republic that was literally knee-deep in plastic trash. The contrast between those two places haunts me."},
+      {author:'PacificSailor',date:'2026-01-19',text:"The fishing gear observation aligns with what I saw on my Pacific crossing. Consumer plastic gets the attention but abandoned fishing gear is disproportionately harmful. It keeps killing for decades."},
+      {author:'LandlubberDreamer',date:'2026-01-19',text:"What boat did you sail? And what was the scariest moment of the trip?"},
+      {author:'GreenSailor2025',date:'2026-01-20',text:"38-foot Allied Princess ketch (1970s fiberglass). Scariest moment: getting caught in a sudden squall in the Indian Ocean with 50-knot winds and 6-meter seas. That was 6 hours of pure survival mode. The boat handled it better than we did."},
+      {author:'BeachCleanupDaily',date:'2026-01-20',text:"Can't wait to read your book. When is it coming out? And where can we follow your journey in the meantime?"},
+    ]
+  }
+];
+
+// ===== Repost tracking =====
+// Each repost creates a new post referencing the original
+
+// ===== 存储 =====
+let allPosts = JSON.parse(localStorage.getItem('ocean_forum_posts_v2') || 'null');
+if (!allPosts || allPosts.length === 0) {
+  allPosts = seedPosts.map(p => ({...p, comments: [...(p.comments||[])], isRepost: false, originalAuthor: null, originalId: null}));
+  localStorage.setItem('ocean_forum_posts_v2', JSON.stringify(allPosts));
+}
+
+// Initialize comment localStorage from seed data
+seedPosts.forEach(p => {
+  const key = 'ocean_forum_comments_v2_' + p.id;
+  if (!localStorage.getItem(key)) {
+    localStorage.setItem(key, JSON.stringify(p.comments || []));
+  }
+});
+
+// ===== 渲染帖子 =====
+function renderPosts(filterTag) {
+  const container = document.getElementById('posts-container');
+  const countEl = document.getElementById('post-count');
+  let posts = filterTag ? allPosts.filter(p => p.tags && p.tags.includes(filterTag)) : allPosts;
+  countEl.textContent = posts.length + ' posts';
+
+  if (posts.length === 0) {
+    container.innerHTML = '<div class="tactile-base rounded-xl p-12 text-center text-cyan-400/30">No posts with this tag yet.</div>';
+    return;
+  }
+
+  container.innerHTML = posts.map(p => `
+    <div class="tactile-base rounded-2xl overflow-hidden" id="post-${p.id}">
+      ${p.isRepost ? `<div class="px-5 pt-4"><span class="reposted-badge"><iconify-icon icon="mdi:repeat" width="12"></iconify-icon> Reposted from ${p.originalAuthor || 'Unknown'}</span></div>` : ''}
+      <div class="md:flex">
+        ${p.image ? `<div class="md:w-64 flex-shrink-0 overflow-hidden" style="min-height:200px;"><img src="${p.image}" alt="${p.title}" class="post-image w-full h-full object-cover" onerror="this.parentElement.style.display='none'" style="min-height:200px;"></div>` : ''}
+        <div class="flex-1 p-5">
+          <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+            ${(p.tags||[]).map(t => `<span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/15 text-cyan-400 cursor-pointer hover:bg-cyan-500/20 transition-colors" onclick="event.stopPropagation();renderPosts('${t}')">#${t}</span>`).join('')}
+          </div>
+          <h3 class="text-base font-semibold text-cyan-50 mb-2">${p.title}</h3>
+          <div class="text-sm text-cyan-200/65 mb-3 leading-relaxed max-h-20 overflow-hidden">${p.content.replace(/<[^>]*>/g, '').substring(0, 200)}...</div>
+          <div class="flex items-center justify-between text-xs text-cyan-400/40 flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <span class="flex items-center gap-1"><iconify-icon icon="mdi:account-circle" width="14"></iconify-icon>${p.author}</span>
+              <span>${p.date}</span>
+              ${p.reposts > 0 ? `<span class="flex items-center gap-1"><iconify-icon icon="mdi:repeat" width="12"></iconify-icon>${p.reposts}</span>` : ''}
+            </div>
+            <div class="flex items-center gap-3">
+              <button onclick="likePost(${p.id})" class="flex items-center gap-1 hover:text-cyan-300 transition-colors bg-transparent border-0 cursor-pointer" style="color:inherit;"><iconify-icon icon="mdi:heart-outline" width="14"></iconify-icon>${p.likes||0}</button>
+              <button onclick="repostPost(${p.id})" class="flex items-center gap-1 hover:text-cyan-300 transition-colors bg-transparent border-0 cursor-pointer" style="color:inherit;"><iconify-icon icon="mdi:repeat" width="14"></iconify-icon>${p.reposts||0}</button>
+              <button onclick="toggleExpand(${p.id})" class="flex items-center gap-1 hover:text-cyan-300 transition-colors bg-transparent border-0 cursor-pointer" style="color:inherit;"><iconify-icon icon="mdi:comment-outline" width="14"></iconify-icon>${getCommentCount(p.id)}</button>
+            </div>
+          </div>
+          <div class="hidden mt-4 pt-4 border-t border-cyan-500/10" id="expand-${p.id}">
+            <div class="text-sm text-cyan-200/75 whitespace-pre-line leading-relaxed">${p.content}</div>
+            ${p.image ? `<div class="mt-4 rounded-lg overflow-hidden"><img src="${p.image}" alt="${p.title}" class="w-full object-cover rounded-lg" style="max-height:400px;" onerror="this.style.display='none'"></div>` : ''}
+            <div class="mt-4" id="comments-section-${p.id}">
+              <h4 class="text-xs font-medium text-cyan-400/50 mb-2">Comments (${getCommentCount(p.id)})</h4>
+              <div id="comments-list-${p.id}" class="space-y-2 mb-3"></div>
+              <div class="flex gap-2">
+                <input type="text" id="comment-input-${p.id}" placeholder="Add a comment..." class="flex-1 bg-cyan-950/30 border border-cyan-500/10 rounded-lg px-3 py-1.5 text-xs text-cyan-100 placeholder:text-cyan-400/25 focus:outline-none focus:border-cyan-400/40">
+                <button onclick="addComment(${p.id})" class="btn-physical-dark px-3 py-1.5 rounded-lg text-xs">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function getCommentCount(id) {
+  const key = 'ocean_forum_comments_v2_' + id;
+  const comments = JSON.parse(localStorage.getItem(key) || '[]');
+  return comments.length;
+}
+
+// ===== 交互函数 =====
+function toggleExpand(id) {
+  const el = document.getElementById('expand-' + id);
+  if (!el) return;
+  const wasHidden = el.classList.contains('hidden');
+  el.classList.toggle('hidden');
+  if (!el.classList.contains('hidden')) loadComments(id);
+}
+
+function likePost(id) {
+  const post = allPosts.find(p => p.id === id);
+  if (!post) return;
+  post.likes = (post.likes||0) + 1;
+  localStorage.setItem('ocean_forum_posts_v2', JSON.stringify(allPosts));
+  renderCurrentFilter();
+  showToast('Liked! ❤️');
+}
+
+function repostPost(id) {
+  const post = allPosts.find(p => p.id === id);
+  if (!post) return;
+  post.reposts = (post.reposts||0) + 1;
+  const repost = {
+    id: Date.now(),
+    author: 'Anonymous',
+    date: new Date().toISOString().split('T')[0],
+    title: '🔁 ' + post.title,
+    content: post.content,
+    image: post.image,
+    tags: [...(post.tags||[])],
+    likes: 0,
+    reposts: 0,
+    isRepost: true,
+    originalAuthor: post.author,
+    originalId: post.id
+  };
+  allPosts.unshift(repost);
+  localStorage.setItem('ocean_forum_posts_v2', JSON.stringify(allPosts));
+  renderCurrentFilter();
+  showToast('Post reposted! 🔁');
+  setTimeout(() => { const el = document.getElementById('post-'+repost.id); if (el) el.scrollIntoView({behavior:'smooth',block:'center'}); }, 200);
+}
+
+function addComment(id) {
+  const input = document.getElementById('comment-input-'+id);
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  const key = 'ocean_forum_comments_v2_'+id;
+  const comments = JSON.parse(localStorage.getItem(key)||'[]');
+  comments.push({author:'You',date:new Date().toISOString().split('T')[0],text});
+  localStorage.setItem(key, JSON.stringify(comments));
+  input.value = '';
+  loadComments(id);
+  renderCurrentFilter();
+  showToast('Comment added! 💬');
+}
+
+function loadComments(id) {
+  const key = 'ocean_forum_comments_v2_' + id;
+  const comments = JSON.parse(localStorage.getItem(key)||'[]');
+  const listEl = document.getElementById('comments-list-'+id);
+  if (!listEl) return;
+  if (comments.length===0) { listEl.innerHTML = '<div class="text-xs text-cyan-400/25">No comments yet. Be the first!</div>'; return; }
+  listEl.innerHTML = comments.map(c => `
+    <div class="bg-cyan-950/20 rounded-lg px-3 py-2 text-xs">
+      <div class="flex items-center gap-2 mb-0.5">
+        <span class="text-cyan-400/60 font-medium">${c.author}</span>
+        <span class="text-cyan-400/20">${c.date}</span>
+      </div>
+      <p class="text-cyan-200/65">${c.text}</p>
+    </div>
+  `).join('');
+}
+
+let currentFilterTag = null;
+function renderCurrentFilter() { renderPosts(currentFilterTag); }
+
+let pendingImageData = null;
+
+function previewPostImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { showToast('Image too large! Max 2MB'); e.target.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    pendingImageData = ev.target.result;
+    document.getElementById('image-preview-name').textContent = file.name;
+    document.getElementById('clear-image-btn').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearPostImage() {
+  pendingImageData = null;
+  document.getElementById('post-image').value = '';
+  document.getElementById('image-preview-name').textContent = '';
+  document.getElementById('clear-image-btn').classList.add('hidden');
+}
+
+function submitPost(e) {
+  e.preventDefault();
+  const author = document.getElementById('post-author').value.trim();
+  const title = document.getElementById('post-title').value.trim();
+  const content = document.getElementById('post-content').value.trim();
+  if (!author||!title||!content) return;
+  const p = {id:Date.now(),author,title,content,image:pendingImageData||null,date:new Date().toISOString().split('T')[0],likes:0,reposts:0,comments:0,tags:[],isRepost:false,originalAuthor:null,originalId:null};
+  allPosts.unshift(p);
+  localStorage.setItem('ocean_forum_posts_v2',JSON.stringify(allPosts));
+  localStorage.setItem('ocean_forum_comments_v2_'+p.id,JSON.stringify([]));
+  document.getElementById('post-author').value='';
+  document.getElementById('post-title').value='';
+  document.getElementById('post-content').value='';
+  clearPostImage();
+  renderCurrentFilter();
+  showToast('Post published! 🎉');
+  setTimeout(()=>{const el=document.getElementById('post-'+p.id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},200);
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._to);t._to=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  renderPosts();
+  const v=document.getElementById('global-video');
+  if(v){v.play().catch(()=>{});document.addEventListener('click',()=>{v.muted=true;v.play().catch(()=>{});},{once:true});}
+});
+</script>
+</body>
+</html>

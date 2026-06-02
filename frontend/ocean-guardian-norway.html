@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>挪威海域污染监测 - Ocean Guardian</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script>
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    if (typeof url === 'string' && url.includes('events.mapbox.com')) {
+      return new Promise(function(resolve) { resolve({ ok: false, status: 0, json: function(){ return Promise.resolve({}); }, text: function(){ return Promise.resolve(''); } }); });
+    }
+    return _origFetch.apply(this, arguments);
+  };
+  var _origSendBeacon = navigator.sendBeacon;
+  navigator.sendBeacon = function(url, data) {
+    if (typeof url === 'string' && url.includes('events.mapbox.com')) return true;
+    return _origSendBeacon.apply(navigator, arguments);
+  };
+  </script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:#020a14}
+    ::-webkit-scrollbar-thumb{background:#0e7490;border-radius:3px}
+    body{background:#020a14;color:#cffafe;overflow-x:hidden}
+
+    /* 视频背景 */
+    #global-video-bg{position:fixed;top:0;left:0;width:100%;height:100vh;z-index:0;overflow:hidden;opacity:0.55;transition:opacity 0.8s cubic-bezier(0.4,0,0.2,1)}
+    #global-video-bg video{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0}
+    #global-video-bg .video-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,rgba(0,10,30,0.7) 0%,rgba(2,15,35,0.6) 50%,rgba(0,5,20,0.7) 100%)}
+    #global-video-bg .bottom-gradient{position:absolute;bottom:0;left:0;width:100%;height:40%;background:linear-gradient(to top,rgba(2,10,20,1) 0%,transparent 100%);pointer-events:none}
+
+    .tactile-base{background:rgba(2,15,35,0.7);border:1px solid rgba(255,255,255,0.08);backdrop-filter:blur(12px)}
+    .tactile-inset{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.04)}
+    .zh-note{display:block;font-size:12px;color:rgba(207,250,254,0.35);margin-top:2px}
+    .stat-card{transition:all 0.3s}
+    .stat-card:hover{transform:translateY(-2px);border-color:rgba(6,182,212,0.3)}
+    .quality-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+    #norway-map{opacity:0.78;transition:opacity 0.5s}
+  </style>
+</head>
+<body class="font-['Inter',sans-serif]">
+
+<!-- 动态视频背景 -->
+<div id="global-video-bg">
+  <video loop playsinline id="global-video" muted>
+    <source src="public/ocean-bg.mp4" type="video/mp4">
+  </video>
+  <div class="video-overlay"></div>
+  <div class="bottom-gradient"></div>
+</div>
+
+<div style="position:relative;z-index:1;">
+
+<!-- Header -->
+<header class="fixed top-0 left-0 right-0 z-50 tactile-base border-b border-white/5" style="backdrop-filter:blur(20px);">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <iconify-icon icon="mdi:shield-water" width="28" class="text-blue-400"></iconify-icon>
+      <div>
+        <h1 class="text-lg font-bold text-cyan-50">挪威海域污染监测</h1>
+        <span class="text-xs text-cyan-400/40">Norwegian Sea Pollution · Mareano 2006-2021</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 text-sm">
+      <a href="ocean-guardian.html" class="text-cyan-400/60 hover:text-cyan-300 transition-colors no-underline">&larr; 返回主页</a>
+      <span class="text-cyan-400/20">|</span>
+      <span class="text-cyan-400/40 text-xs">Mareano · 挪威海洋环境监测</span>
+    </div>
+  </div>
+</header>
+
+<main class="pt-16">
+
+  <!-- Stats Bar -->
+  <section class="py-6 px-4">
+    <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4" id="stats-bar">
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-cyan-400" id="stat-org">--</div><span class="text-xs text-cyan-400/50">有机污染物样本</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-violet-400" id="stat-mp">--</div><span class="text-xs text-cyan-400/50">微塑料样本</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-amber-400" id="stat-thc">--</div><span class="text-xs text-cyan-400/50">平均THC mg/kg</span></div>
+      <div class="tactile-base stat-card rounded-xl p-4 text-center"><div class="text-2xl font-black text-red-400" id="stat-mpmax">--</div><span class="text-xs text-cyan-400/50">最高微塑料 µg/kg</span></div>
+    </div>
+  </section>
+
+  <!-- 3D Map -->
+  <section class="relative" style="height:65vh;">
+    <div id="norway-map" style="width:100%;height:100%;"></div>
+    <div class="absolute bottom-4 left-4 tactile-base rounded-xl p-4 text-xs z-10" style="background:rgba(2,10,20,0.85);">
+      <div class="font-semibold text-cyan-200 mb-2">污染物指标</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot" style="background:#22c55e;"></span>低浓度 Low</div>
+      <div class="flex items-center gap-2 mb-1"><span class="quality-dot" style="background:#eab308;"></span>中浓度 Medium</div>
+      <div class="flex items-center gap-2"><span class="quality-dot" style="background:#ef4444;"></span>高浓度 High</div>
+    </div>
+    <div class="absolute top-4 right-4 tactile-base rounded-xl p-3 z-10 flex gap-2 text-xs" style="background:rgba(2,10,20,0.85);">
+      <button class="no-layer-btn px-3 py-1.5 rounded-lg transition-all active" data-layer="organic" style="background:rgba(6,182,212,0.2);border:1px solid rgba(6,182,212,0.3);color:#67e8f9;">有机污染物</button>
+      <button class="no-layer-btn px-3 py-1.5 rounded-lg transition-all" data-layer="microplastic" style="background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(207,250,254,0.6);">微塑料</button>
+    </div>
+  </section>
+
+  <!-- Charts Grid -->
+  <section class="py-10 px-4">
+    <div class="max-w-7xl mx-auto grid md:grid-cols-2 gap-6">
+
+      <!-- PAH Profile -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:molecule" width="18" class="text-amber-400"></iconify-icon>
+          多环芳烃 (PAH) 污染谱图
+        </h3>
+        <span class="zh-note mb-4">6种关键PAH平均浓度对比</span>
+        <div style="height:300px;"><canvas id="chart-pah"></canvas></div>
+      </div>
+
+      <!-- PCB Profile -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:chemical-weapon" width="18" class="text-orange-400"></iconify-icon>
+          多氯联苯 (PCB) 同系物分布
+        </h3>
+        <span class="zh-note mb-4">PCB7 各同系物平均浓度对比</span>
+        <div style="height:300px;"><canvas id="chart-pcb"></canvas></div>
+      </div>
+
+      <!-- Yearly Trends -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:chart-line" width="18" class="text-cyan-400"></iconify-icon>
+          污染物年际变化趋势
+        </h3>
+        <span class="zh-note mb-4">2006-2021 PAH / PCB / THC 年度均值</span>
+        <div style="height:320px;"><canvas id="chart-yearly"></canvas></div>
+      </div>
+
+      <!-- Depth Profile -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:waves-arrow-down" width="18" class="text-blue-400"></iconify-icon>
+          污染物深度剖面
+        </h3>
+        <span class="zh-note mb-4">各深度区间THC、BaP、PCB浓度变化</span>
+        <div style="height:320px;"><canvas id="chart-depth"></canvas></div>
+      </div>
+
+      <!-- Microplastic Yearly -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:bottle-wine" width="18" class="text-violet-400"></iconify-icon>
+          微塑料年际趋势
+        </h3>
+        <span class="zh-note mb-4">2011-2021 微塑料颗粒数及浓度年度变化</span>
+        <div style="height:320px;"><canvas id="chart-mp-yearly"></canvas></div>
+      </div>
+
+      <!-- Chemical Summary Table -->
+      <div class="tactile-base rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-cyan-50 mb-2 flex items-center gap-2">
+          <iconify-icon icon="mdi:flask" width="18" class="text-teal-400"></iconify-icon>
+          新兴污染物概览
+        </h3>
+        <span class="zh-note mb-4">PFAS & Siloxanes 平均浓度</span>
+        <div class="space-y-3" id="emerging-pollutants"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== 受影响物种 · Affected Species ===== -->
+  <section class="pb-10 px-4">
+    <div class="max-w-7xl mx-auto">
+      <div class="text-center mb-8">
+        <h2 class="text-2xl font-bold text-cyan-50 flex items-center justify-center gap-2">
+          <iconify-icon icon="mdi:fish" width="24" class="text-blue-400"></iconify-icon>
+          挪威海域受威胁物种
+        </h2>
+        <span class="zh-note">挪威海峡污染对北极及北大西洋海洋生物造成持续威胁</span>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6">
+
+        <!-- 虎鲸 -->
+        <div class="tactile-base rounded-2xl overflow-hidden group">
+          <div class="h-52 overflow-hidden relative">
+            <img src="public/species/killer_whale.jpg" alt="虎鲸 Killer Whale" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            <div class="absolute bottom-3 left-4">
+              <span class="px-2 py-0.5 rounded text-xs bg-red-500/80 text-white">受威胁 TH</span>
+            </div>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-cyan-50">虎鲸 <span class="text-xs text-cyan-400/40 font-normal ml-1">Killer Whale / Orca</span></h3>
+            <p class="text-xs text-cyan-400/30 italic mt-0.5">Orcinus orca</p>
+            <p class="text-sm text-cyan-200/60 mt-3 leading-relaxed">挪威海域的顶级捕食者，被誉为"海洋之王"。持久性有机污染物(POPs)通过食物链在虎鲸体内富集，导致繁殖障碍和免疫系统损伤，挪威沿海种群数量锐减。</p>
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              <span class="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">POPs富集</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">PFAS污染</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">微塑料</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 大西洋鲑 -->
+        <div class="tactile-base rounded-2xl overflow-hidden group">
+          <div class="h-52 overflow-hidden relative">
+            <img src="public/species/atlantic_salmon.jpg" alt="大西洋鲑 Atlantic Salmon" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            <div class="absolute bottom-3 left-4">
+              <span class="px-2 py-0.5 rounded text-xs bg-amber-500/80 text-white">近危 NT</span>
+            </div>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-cyan-50">大西洋鲑 <span class="text-xs text-cyan-400/40 font-normal ml-1">Atlantic Salmon</span></h3>
+            <p class="text-xs text-cyan-400/30 italic mt-0.5">Salmo salar</p>
+            <p class="text-sm text-cyan-200/60 mt-3 leading-relaxed">挪威是全球最大的大西洋鲑养殖国，野生种群却因养殖逃逸、海虱传播、化学污染物排放而急剧减少。多氯联苯(PCBs)和二噁英在鱼肉中检出率居高不下。</p>
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">PCBs污染</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">养殖污染</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20">海虱病害</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 北极鳕 -->
+        <div class="tactile-base rounded-2xl overflow-hidden group">
+          <div class="h-52 overflow-hidden relative">
+            <img src="public/species/arctic_cod.jpg" alt="北极鳕 Arctic Cod" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            <div class="absolute bottom-3 left-4">
+              <span class="px-2 py-0.5 rounded text-xs bg-blue-500/80 text-white">关注 LC</span>
+            </div>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-cyan-50">北极鳕 <span class="text-xs text-cyan-400/40 font-normal ml-1">Arctic Cod / Polar Cod</span></h3>
+            <p class="text-xs text-cyan-400/30 italic mt-0.5">Boreogadus saida</p>
+            <p class="text-sm text-cyan-200/60 mt-3 leading-relaxed">北极生态系统的关键种，是海豹、海鸟和鲸类的核心食物来源。气候变化导致海冰融化、微塑料在北极水域累积，北极鳕仔鱼误食微塑料比例高达35%。</p>
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              <span class="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">气候变暖</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">微塑料摄入</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">食物链断裂</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer class="border-t border-white/5 py-8 text-center">
+    <p class="text-xs text-cyan-400/30">Mareano (2006- ) · 挪威海洋环境监测计划 · Ocean Guardian Monitoring System</p>
+  </footer>
+</main>
+</div>
+
+<script>
+(function(){
+  const API = 'http://localhost:5000/api/norway';
+  mapboxgl.accessToken = window.MAPBOX_ACCESS_TOKEN || '';
+
+  // 视频背景自动播放
+  (function(){
+    var v = document.getElementById('global-video');
+    v.muted = true;
+    v.play().catch(function(){});
+    document.addEventListener('click', function(){ v.muted = true; v.play().catch(function(){}); }, {once:true});
+  })();
+
+  // ===== 3D Globe =====
+  const map = new mapboxgl.Map({
+    container: 'norway-map',
+    style: 'mapbox://styles/mapbox/dark-v11',
+    center: [5, 68],
+    zoom: 3.8,
+    projection: 'globe',
+    attributionControl: false
+  });
+
+  map.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: true, visualizePitch: true }), 'bottom-right');
+
+  map.on('style.load', () => {
+    try { map.setPaintProperty('water', 'fill-color', '#021e3a'); } catch(e) {}
+    try { map.setPaintProperty('water', 'fill-outline-color', '#053a5e'); } catch(e) {}
+  });
+
+  map.on('load', () => {
+    map.setFog({color:'#020a14', 'high-color':'#021d35', 'horizon-blend':0.12, 'space-color':'#010a16', 'star-intensity':0.7});
+    map.addSource('organic-points', {type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map.addSource('microplastic-points', {type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map.addLayer({id:'organic-circles',type:'circle',source:'organic-points',paint:{'circle-radius':5,'circle-opacity':0.8,'circle-stroke-color':'#fff','circle-stroke-width':0.5,'circle-color':['get','color']}});
+    map.addLayer({id:'mp-circles',type:'circle',source:'microplastic-points',paint:{'circle-radius':['interpolate',['linear'],['get','concentration'],0,4,200,12,400,20],'circle-opacity':0.85,'circle-color':'#a855f7','circle-stroke-color':'#fff','circle-stroke-width':0.8},layout:{visibility:'none'}});
+    loadData();
+  });
+
+  // 自动旋转
+  let rot = setInterval(()=>{if(!map.loaded())return;const c=map.getCenter();map.easeTo({center:[c.lng+0.06,c.lat],duration:2000,easing:t=>t});},2200);
+  map.on('dragstart',()=>clearInterval(rot));
+
+  // 弹窗
+  map.on('click','organic-circles',e=>{const p=e.features[0].properties;new mapboxgl.Popup({closeButton:false}).setLngLat(e.lngLat).setHTML(`<div style="color:#cffafe;font-size:11px;padding:4px;"><strong>THC:</strong> ${p.thc||'--'} mg/kg<br>BaP: ${p.bap||'--'} | PCB153: ${p.pcb153||'--'}<br>Depth: ${p.depth}m | Year: ${p.year}</div>`).addTo(map);});
+  map.on('click','mp-circles',e=>{const p=e.features[0].properties;new mapboxgl.Popup({closeButton:false}).setLngLat(e.lngLat).setHTML(`<div style="color:#cffafe;font-size:11px;padding:4px;"><strong>Microplastics</strong><br>Particles: ${p.particles} #/kg<br>Concentration: ${p.concentration} µg/kg<br>Depth: ${p.depth}m</div>`).addTo(map);});
+
+  // Layer switching
+  document.querySelectorAll('.no-layer-btn').forEach(btn=>{btn.addEventListener('click',()=>{
+    document.querySelectorAll('.no-layer-btn').forEach(b=>{b.classList.remove('active');b.style.background='transparent';b.style.borderColor='rgba(255,255,255,0.1)';b.style.color='rgba(207,250,254,0.6)';});
+    btn.classList.add('active');btn.style.background='rgba(6,182,212,0.2)';btn.style.borderColor='rgba(6,182,212,0.3)';btn.style.color='#67e8f9';
+    var l=btn.dataset.layer;
+    map.setLayoutProperty('organic-circles','visibility',l==='organic'?'visible':'none');
+    map.setLayoutProperty('mp-circles','visibility',l==='microplastic'?'visible':'none');
+  });});
+
+  // ===== Load =====
+  async function loadData(){
+    try{
+      const [overview, yearly, mpYearly, depth, mapPts, mpMap, pah, pcb] = await Promise.all([
+        fetch(API+'/overview').then(r=>r.json()),
+        fetch(API+'/yearly').then(r=>r.json()),
+        fetch(API+'/microplastic-yearly').then(r=>r.json()),
+        fetch(API+'/depth-profile').then(r=>r.json()),
+        fetch(API+'/map-points?sample=600').then(r=>r.json()),
+        fetch(API+'/microplastic-map').then(r=>r.json()),
+        fetch(API+'/pah-summary').then(r=>r.json()),
+        fetch(API+'/pcb-summary').then(r=>r.json())
+      ]);
+      updateStats(overview);
+      renderOrganicMap(mapPts);
+      renderMicroplasticMap(mpMap);
+      renderPAHChart(pah);
+      renderPCBChart(pcb);
+      renderYearlyChart(yearly);
+      renderDepthChart(depth);
+      renderMPYearly(mpYearly);
+      renderEmerging(overview.organic_stats);
+    }catch(e){console.error(e);}
+  }
+
+  function updateStats(ov){
+    document.getElementById('stat-org').textContent = ov.organic_points.toLocaleString();
+    document.getElementById('stat-mp').textContent = ov.microplastic_points;
+    document.getElementById('stat-thc').textContent = (ov.organic_stats.avg_thc||0).toFixed(1);
+    document.getElementById('stat-mpmax').textContent = ov.microplastic_stats.max_concentration;
+  }
+
+  function thcColor(val){if(!val)return'#555';if(val<5)return'#22c55e';if(val<15)return'#eab308';return'#ef4444';}
+  function concColor(val){if(!val)return'#555';if(val<100)return'#a78bfa';if(val<250)return'#c084fc';return'#e879f9';}
+
+  function renderOrganicMap(pts){
+    var features=pts.filter(p=>p.lon&&p.lat).map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{color:thcColor(p.thc),thc:p.thc?Number(p.thc).toFixed(1):null,bap:p.benzoa_pyrene?Number(p.benzoa_pyrene).toFixed(2):null,pcb153:p.pcb_153?Number(p.pcb_153).toFixed(3):null,depth:p.depth?Math.round(p.depth):null,year:p.cruise_year}}));
+    map.getSource('organic-points').setData({type:'FeatureCollection',features});
+  }
+
+  function renderMicroplasticMap(pts){
+    var features=pts.filter(p=>p.lon&&p.lat).map(p=>({type:'Feature',geometry:{type:'Point',coordinates:[p.lon,p.lat]},properties:{concentration:Number(p.microplastic_concentration)||0,particles:Number(p.microplastic_particles)||0,depth:p.depth?Math.round(p.depth):null}}));
+    map.getSource('microplastic-points').setData({type:'FeatureCollection',features});
+  }
+
+  // ===== Charts =====
+  Chart.defaults.color='rgba(207,250,254,0.6)';
+  Chart.defaults.borderColor='rgba(255,255,255,0.06)';
+  Chart.defaults.font.family='Inter, sans-serif';
+
+  function renderPAHChart(data){
+    new Chart(document.getElementById('chart-pah'),{type:'bar',data:{labels:data.map(d=>d.compound),datasets:[{label:'µg/kg',data:data.map(d=>d.avg_val),backgroundColor:['#fef08a60','#eab30860','#f59e0b60','#f9731660','#ef444460','#dc262660'],borderColor:'#eab308',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.03)'}}}}});
+  }
+
+  function renderPCBChart(data){
+    new Chart(document.getElementById('chart-pcb'),{type:'bar',data:{labels:data.map(d=>d.congener),datasets:[{label:'µg/kg',data:data.map(d=>d.avg_val),backgroundColor:'#f9731660',borderColor:'#f97316',borderWidth:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(255,255,255,0.03)'}}}}});
+  }
+
+  function renderYearlyChart(data){
+    new Chart(document.getElementById('chart-yearly'),{type:'line',data:{labels:data.map(d=>d.year),datasets:[
+      {label:'THC (mg/kg)',data:data.map(d=>d.avg_thc),borderColor:'#eab308',backgroundColor:'rgba(234,179,8,0.1)',tension:0.4,fill:true},
+      {label:'Fluoranthene',data:data.map(d=>d.avg_fluor),borderColor:'#f97316',tension:0.4,yAxisID:'y1'},
+      {label:'Pyrene',data:data.map(d=>d.avg_pyr),borderColor:'#ef4444',tension:0.4,yAxisID:'y1'},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{usePointStyle:true,pointStyle:'circle',padding:14,font:{size:10}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.03)'}},y:{title:{text:'THC (mg/kg)',display:true,font:{size:10}},grid:{color:'rgba(255,255,255,0.03)'},min:0},y1:{position:'right',title:{text:'PAH (µg/kg)',display:true,font:{size:10}},grid:{display:false},min:0}}}});
+  }
+
+  function renderDepthChart(data){
+    new Chart(document.getElementById('chart-depth'),{type:'bar',data:{labels:data.map(d=>d.depth_range),datasets:[
+      {label:'THC (mg/kg)',data:data.map(d=>d.avg_thc),backgroundColor:'#eab30860',borderColor:'#eab308',borderWidth:1},
+      {label:'Benzo[a]pyrene (µg/kg)',data:data.map(d=>d.avg_bap),backgroundColor:'#ef444460',borderColor:'#ef4444',borderWidth:1},
+      {label:'PCB-153 (µg/kg)',data:data.map(d=>d.avg_pcb153),backgroundColor:'#f9731660',borderColor:'#f97316',borderWidth:1},
+    ]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{labels:{usePointStyle:true,pointStyle:'rect',padding:12,font:{size:10}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.03)'}},y:{grid:{display:false}}}}});
+  }
+
+  function renderMPYearly(data){
+    new Chart(document.getElementById('chart-mp-yearly'),{type:'line',data:{labels:data.map(d=>d.year),datasets:[
+      {label:'颗粒数 (#/kg)',data:data.map(d=>d.avg_particles),borderColor:'#a855f7',backgroundColor:'rgba(168,85,247,0.1)',tension:0.4,fill:true},
+      {label:'浓度 (µg/kg)',data:data.map(d=>d.avg_concentration),borderColor:'#d946ef',tension:0.4,yAxisID:'y1'},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{usePointStyle:true,pointStyle:'circle',padding:14,font:{size:10}}}},scales:{x:{grid:{color:'rgba(255,255,255,0.03)'}},y:{title:{text:'Particles #/kg',display:true,font:{size:10}},grid:{color:'rgba(255,255,255,0.03)'}},y1:{position:'right',title:{text:'µg/kg',display:true,font:{size:10}},grid:{display:false}}}}});
+  }
+
+  function renderEmerging(stats){
+    document.getElementById('emerging-pollutants').innerHTML = [
+      {label:'PFOS (全氟辛烷磺酸)',val:stats.avg_pfos,unit:'µg/kg',color:'#c084fc'},
+      {label:'PFOA (全氟辛酸)',val:stats.avg_pfoa,unit:'µg/kg',color:'#e879f9'},
+      {label:'BDE-209 (十溴联苯醚)',val:stats.avg_bde209,unit:'µg/kg',color:'#f97316'},
+      {label:'Siloxane D5 (硅氧烷)',val:stats.avg_d5,unit:'µg/kg',color:'#06b6d4'},
+    ].map(i=>`<div class="tactile-inset rounded-xl p-4 flex items-center justify-between"><span class="text-sm text-cyan-200/70">${i.label}</span><span class="text-sm font-bold" style="color:${i.color}">${i.val!==null?Number(i.val).toFixed(2):'N/A'} ${i.unit}</span></div>`).join('');
+  }
+
+})();
+</script>
+</div><!-- 内容区结束 -->
+</body>
+</html>
