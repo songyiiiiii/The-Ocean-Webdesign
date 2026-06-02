@@ -241,8 +241,20 @@ function getUnit(param) {
 }
 
 // ========== 健康检查 ==========
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: '海洋保护API运行正常', database: 'MySQL', websocket: true });
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'unknown';
+  try {
+    const [rows] = await db.query('SELECT 1 AS ok');
+    dbStatus = rows[0].ok === 1 ? 'connected' : 'error';
+  } catch (e) {
+    dbStatus = 'disconnected: ' + e.message;
+  }
+  res.json({
+    status: 'OK',
+    message: '海洋保护API运行正常',
+    database: dbStatus,
+    websocket: true
+  });
 });
 
 // ========== 历史数据查询 API ==========
