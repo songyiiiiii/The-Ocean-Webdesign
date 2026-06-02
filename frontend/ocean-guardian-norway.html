@@ -20,6 +20,8 @@
   };
   </script>
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="./app-config.js"></script>
+  <script src="./mapbox-config.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
@@ -259,7 +261,7 @@
 
 <script>
 (function(){
-  const API = 'http://localhost:5000/api/norway';
+  const API = (window.API_BASE_URL || 'http://localhost:5000/api') + '/norway';
   mapboxgl.accessToken = window.MAPBOX_ACCESS_TOKEN || '';
 
   // 视频背景自动播放

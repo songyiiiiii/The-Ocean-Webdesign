@@ -20,6 +20,8 @@
   };
   </script>
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="./app-config.js"></script>
+  <script src="./mapbox-config.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -386,7 +388,7 @@
 
 <script>
 (function(){
-  var API_BASE_URL = 'http://localhost:5000/api';
+  var API_BASE_URL = window.API_BASE_URL || 'http://localhost:5000/api';
   var authToken = localStorage.getItem('ocean_guardian_token');
   var currentUser = JSON.parse(localStorage.getItem('ocean_guardian_user') || 'null');
   var watchId = null;

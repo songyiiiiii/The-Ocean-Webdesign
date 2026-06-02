@@ -41,6 +41,7 @@ yarn-error.log*
 
 ### Local agent settings ###
 .claude/settings.local.json
+frontend/app-config.js
 frontend/mapbox-config.js
 
 ### Build outputs ###
