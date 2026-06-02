@@ -3803,22 +3803,17 @@ if (enableAudioBtn) {
       if (this.initialized) return;
       this.initialized = true;
 
-      // 创建音频元素
-      this.audio = new Audio();
-      // 请将你的音乐文件放在 public 目录下，或使用在线链接
-      this.audio.src = 'public/ocean-music.mp3';  // 修改为你的音乐文件路径
-      this.audio.loop = true;
-      this.audio.volume = 0.25;
-
-      // 预加载
-      this.audio.load();
-      console.log('🎵 Background music loaded');
+      // 背景音乐（如需启用，放音乐文件到 public/ 下并取消注释）
+      // this.audio = new Audio();
+      // this.audio.src = 'public/ocean-music.mp3';
+      // this.audio.loop = true;
+      // this.audio.volume = 0.25;
+      // this.audio.load();
     },
 
     play: function() {
-      if (!this.audio) this.init();
       if (this.isPlaying) return;
-
+      if (!this.audio) return;
       this.audio.play().then(() => {
         this.isPlaying = true;
         console.log('🎵 Music playing');
