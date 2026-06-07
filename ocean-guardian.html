@@ -3058,13 +3058,21 @@ const AudioManager = {
      }
    }, { passive: true });
 
-   // 延迟确保 hero 视频播放
+   // 延迟确保 hero 视频播放，并后台预加载其他视频
    setTimeout(function() {
      if (heroVideo && heroVideo.paused) {
        heroVideo.muted = true;
        heroVideo.play().catch(function(){});
        console.log('📹 Hero video started');
      }
+     // 2秒后后台悄悄预加载背景视频（不播放，只下载）
+     setTimeout(function() {
+       [globalVideo, transitionVideoEl].filter(Boolean).forEach(function(v) {
+         v.muted = true;
+         v.load();
+       });
+       console.log('📥 Background videos preloaded');
+     }, 2000);
    }, 300);
 
    // ===== 自动滚动 =====
