@@ -1176,7 +1176,7 @@ body {
 <!-- ===== HERO SECTION - 全屏视频 + 左下角内容 ===== -->
 <section class="hero-section" id="hero-section">
   <div class="hero-video-container" id="hero-video-container">
-    <video autoplay loop playsinline id="hero-video" data-audio="hero">
+    <video loop playsinline muted id="hero-video" data-audio="hero" preload="none">
       <source src="public/ocean-hero.mp4" type="video/mp4">
     </video>
   </div>
@@ -2757,19 +2757,14 @@ const AudioManager = {
     // *** 关键：必须在同一个调用栈中直接操作 ***
     const allVideos = [heroVideo, globalVideo, transitionVideo].filter(v => v);
 
-    // 1. 先确保所有视频开始播放（静音模式）
-    allVideos.forEach(video => {
-      video.muted = true;
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(e => {
-          console.log('Video play failed:', e);
-          // 如果播放失败，重新加载再试
-          video.load();
-          video.muted = true;
-          video.play().catch(err => console.log('Retry failed:', err));
-        });
-      }
+    // 1. 只播放首屏 hero 视频，其他延迟加载
+    if (heroVideo) {
+      heroVideo.muted = true;
+      heroVideo.play().catch(e => console.log('Hero play:', e));
+    }
+    // 背景视频和过渡视频在滚动到附近时才加载
+    [globalVideo, transitionVideo].filter(Boolean).forEach(function(v) {
+      v.dataset.lazyReady = '0';
     });
 
     // 2. 立即取消 hero 静音（在用户交互上下文内）
@@ -3063,16 +3058,14 @@ const AudioManager = {
      }
    }, { passive: true });
 
-   // 初始预加载所有视频
+   // 延迟确保 hero 视频播放
    setTimeout(function() {
-     [heroVideo, globalVideo, transitionVideoEl].forEach(function(v) {
-       if (v) {
-         v.muted = true;
-         v.play().catch(function(){});
-       }
-     });
-     console.log('📹 Videos preloaded');
-   }, 500);
+     if (heroVideo && heroVideo.paused) {
+       heroVideo.muted = true;
+       heroVideo.play().catch(function(){});
+       console.log('📹 Hero video started');
+     }
+   }, 300);
 
    // ===== 自动滚动 =====
    var autoScrollActive = false;
