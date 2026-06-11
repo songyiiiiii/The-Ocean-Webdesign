@@ -2933,7 +2933,7 @@ const AudioManager = {
        }
      }
 
-    // ===== 视频过渡系统 v3（滚动控制 transition 视频进度，交叉淡入淡出） =====
+    // ===== 视频过渡系统 v4（wheel 劫持控制视频播放，页面不滚动） =====
  (function(){
    const heroContainer = document.getElementById('hero-video-container');
    const heroOverlay = document.querySelector('.hero-video-overlay');
@@ -2944,15 +2944,15 @@ const AudioManager = {
    const transitionSection = document.getElementById('transition-video-section');
    const transitionVideoEl = document.getElementById('transition-video');
 
-   // 给容器加 CSS transition 用于交叉淡入淡出
+   // CSS transition 用于交叉淡入淡出
    [heroContainer, transitionSection, globalVideoContainer].forEach(function(el) {
-     if (el) el.style.transition = 'opacity 0.6s ease';
+     if (el) el.style.transition = 'opacity 0.3s ease';
    });
 
-   let currentPhase = 'hero';       // 'hero' | 'scrub' | 'content'
-   let ticking = false;
-   let transitionReady = false;     // transition 视频是否已加载完元数据
-   let scrubProgress = 0;           // 0~1, video playback progress
+   var currentPhase = 'hero';       // 'hero' | 'scrub' | 'content'
+   var transitionReady = false;
+   var scrubProgress = 0;           // 0~1
+   var SCRUB_SENSITIVITY = 2500;    // 累计滚动像素量完成整个视频
 
    // 等 transition 视频元数据加载完
    if (transitionVideoEl) {
@@ -2961,7 +2961,6 @@ const AudioManager = {
        transitionVideoEl.currentTime = 0;
        transitionVideoEl.pause();
      });
-     // 如果已经加载完了
      if (transitionVideoEl.readyState >= 1) transitionReady = true;
    }
 
@@ -2971,124 +2970,208 @@ const AudioManager = {
      video.play().catch(function(){});
    }
 
-   // 更新视频层的 opacity（交叉淡入淡出）
    function updateLayerOpacities(heroO, transO, bgO) {
      if (heroContainer) heroContainer.style.opacity = String(heroO);
      if (transitionSection) {
        transitionSection.style.opacity = String(transO);
-       transitionSection.style.pointerEvents = transO > 0.05 ? 'none' : 'none';
+       transitionSection.style.pointerEvents = 'none';
      }
      if (globalVideoContainer) globalVideoContainer.style.opacity = String(bgO);
    }
 
-   function handleVideoTransition() {
-     var scrollY = window.scrollY;
-     var vh = window.innerHeight;
-     var maxScroll = document.body.scrollHeight - vh;
+   // ===== 页面滚动锁 =====
+   function lockScroll() {
+     document.documentElement.style.overflow = 'hidden';
+     document.body.style.overflow = 'hidden';
+   }
+   function unlockScroll() {
+     document.documentElement.style.overflow = '';
+     document.body.style.overflow = '';
+   }
 
-     // 区域定义
-     var heroEnd = vh * 0.75;                          // hero 结束，开始 scrubbing
-     var scrubTotal = vh * 2.0;                         // scrubbing 需要的滚动距离
-     var scrubEnd = heroEnd + scrubTotal;               // scrubbing 结束，进入 content
+   // ===== 切换到过渡阶段 =====
+   function switchToScrub() {
+     if (currentPhase === 'scrub') return;
+     currentPhase = 'scrub';
+     scrubProgress = 0;
 
-     // 防止 scrubEnd 超出最大滚动距离
-     if (scrubEnd > maxScroll * 0.85) {
-       scrubEnd = maxScroll * 0.85;
-       if (scrubEnd < heroEnd + 100) scrubEnd = heroEnd + 100;
+     if (heroVideo) heroVideo.pause();
+     if (transitionReady && transitionVideoEl) {
+       transitionVideoEl.currentTime = 0;
+       transitionVideoEl.muted = true;
+       transitionVideoEl.play().catch(function(){});
      }
-     var scrubRange = scrubEnd - heroEnd;
+     AudioManager.setAudio(transitionVideoEl, 'transition');
 
-     // 归一化 scrub 进度 0~1
-     var rawProgress = (scrollY - heroEnd) / scrubRange;
-     rawProgress = Math.max(0, Math.min(1, rawProgress));
+     updateLayerOpacities(0, 1, 0);
+     if (scrollIndicator) scrollIndicator.style.opacity = '0';
 
-     // --- Phase 判断 ---
-     if (scrollY < heroEnd) {
-       // === HERO ===
-       if (currentPhase !== 'hero') {
-         preBuffer(heroVideo);
-         updateLayerOpacities(1, 0, 0);
-         AudioManager.setAudio(heroVideo, 'hero');
-         currentPhase = 'hero';
-       }
-       // hero overlay 跟随滚动加深
-       if (heroOverlay) {
-         var p = Math.min(1, scrollY / (heroEnd * 0.9));
-         heroOverlay.style.background = 'radial-gradient(ellipse at 30% 80%, rgba(2,10,20,' + (0.03 + p * 0.12).toFixed(3) + ') 0%, rgba(2,10,20,' + (0.08 + p * 0.32).toFixed(3) + ') 50%, rgba(2,10,20,' + (0.15 + p * 0.50).toFixed(3) + ') 100%)';
-       }
+     if (heroOverlay) {
+       heroOverlay.style.background = 'radial-gradient(ellipse at 30% 80%, rgba(2,10,20,0.15) 0%, rgba(2,10,20,0.40) 50%, rgba(2,10,20,0.65) 100%)';
+     }
+   }
 
-     } else if (scrollY < scrubEnd) {
-       // === SCRUB (scroll controls ocean-tran.mp4) ===
-       if (currentPhase !== 'scrub') {
-         // 进入 scrub：暂停 hero，交接到 transition
-         if (transitionReady && transitionVideoEl) {
-           transitionVideoEl.currentTime = 0;
-           transitionVideoEl.pause();
-           transitionVideoEl.muted = true;
+   // ===== 切换到内容阶段 =====
+   function switchToContent() {
+     if (currentPhase === 'content') return;
+     currentPhase = 'content';
+     scrubProgress = 1;
+
+     if (transitionVideoEl) transitionVideoEl.pause();
+     preBuffer(globalVideo);
+     updateLayerOpacities(0, 0, 1);
+     AudioManager.setAudio(globalVideo, 'global');
+
+     unlockScroll();
+
+     if (heroOverlay) {
+       heroOverlay.style.background = 'radial-gradient(ellipse at 30% 80%, rgba(2,10,20,0.18) 0%, rgba(2,10,20,0.45) 50%, rgba(2,10,20,0.75) 100%)';
+     }
+   }
+
+   // ===== 回退到 Hero =====
+   function switchToHero() {
+     if (currentPhase === 'hero') return;
+     currentPhase = 'hero';
+     scrubProgress = 0;
+
+     if (transitionVideoEl) transitionVideoEl.pause();
+     preBuffer(heroVideo);
+     updateLayerOpacities(1, 0, 0);
+     AudioManager.setAudio(heroVideo, 'hero');
+
+     if (scrollIndicator) scrollIndicator.style.opacity = '1';
+     if (heroOverlay) heroOverlay.style.background = '';
+   }
+
+   // ===== 核心：wheel 劫持 =====
+   window.addEventListener('wheel', function(e) {
+     if (currentPhase === 'content') return; // 内容区正常滚动
+
+     e.preventDefault();
+
+     // 用户手动滚轮 → 取消自动滚动
+     if (window._autoScrollActive) {
+       window._userScrolled = true;
+       window._cancelAutoScroll();
+     }
+
+     var delta = e.deltaY;
+     if (e.deltaMode === 1) delta *= 40; // Firefox lines→pixels
+
+     if (currentPhase === 'hero') {
+       if (delta > 0) {
+         switchToScrub();
+         // 首帧也推进一点
+         scrubProgress = Math.min(0.05, delta / SCRUB_SENSITIVITY);
+         if (transitionReady && transitionVideoEl && transitionVideoEl.duration) {
+           transitionVideoEl.currentTime = scrubProgress * transitionVideoEl.duration;
          }
-         AudioManager.setAudio(transitionVideoEl, 'transition');
-         currentPhase = 'scrub';
        }
+       return;
+     }
 
-       // 根据滚动位置 scrub transition 视频
+     if (currentPhase === 'scrub') {
+       scrubProgress += delta / SCRUB_SENSITIVITY;
+       scrubProgress = Math.max(0, Math.min(1, scrubProgress));
+
+       // 更新视频时间
        if (transitionReady && transitionVideoEl && transitionVideoEl.duration) {
-         var targetTime = rawProgress * transitionVideoEl.duration;
-         // 避免频繁 seek 造成闪烁：时间差 > 0.05s 才更新
-         if (Math.abs(transitionVideoEl.currentTime - targetTime) > 0.06) {
+         var targetTime = scrubProgress * transitionVideoEl.duration;
+         if (Math.abs(transitionVideoEl.currentTime - targetTime) > 0.05) {
            transitionVideoEl.currentTime = targetTime;
          }
        }
 
-       scrubProgress = rawProgress;
-
-       // 交叉淡入淡出：接近 scrub 开始/结束时做渐变
-       var fadeIn = Math.min(1, rawProgress * 4);        // 前 25% 的 scrubbing 内淡入
-       var fadeOut = rawProgress > 0.85 ? Math.min(1, (1 - rawProgress) / 0.15) : 1;  // 后 15% 开始淡出
-       var transOpacity = Math.min(fadeIn, fadeOut);
-       var heroOpacity = 1 - fadeIn;
-
-       // bg 在 scrubbing 最后 15% 开始淡入
-       var bgFadeIn = rawProgress > 0.85 ? (rawProgress - 0.85) / 0.15 : 0;
-       updateLayerOpacities(heroOpacity, transOpacity, bgFadeIn);
-
-       // hero overlay 持续加深
-       if (heroOverlay) {
-         heroOverlay.style.background = 'radial-gradient(ellipse at 30% 80%, rgba(2,10,20,0.15) 0%, rgba(2,10,20,0.40) 50%, rgba(2,10,20,0.65) 100%)';
+       // 末尾 15%：global bg 淡入
+       if (scrubProgress > 0.85) {
+         updateLayerOpacities(0, 1, (scrubProgress - 0.85) / 0.15);
+       } else {
+         updateLayerOpacities(0, 1, 0);
        }
 
-     } else {
-       // === CONTENT (ocean-bg.mp4 autoplay) ===
-       if (currentPhase !== 'content') {
-         preBuffer(globalVideo);
-         updateLayerOpacities(0, 0, 1);
-         AudioManager.setAudio(globalVideo, 'global');
-         currentPhase = 'content';
-       }
-       if (heroOverlay) {
-         heroOverlay.style.background = 'radial-gradient(ellipse at 30% 80%, rgba(2,10,20,0.18) 0%, rgba(2,10,20,0.45) 50%, rgba(2,10,20,0.75) 100%)';
-       }
+       if (scrubProgress >= 1) switchToContent();
+       if (scrubProgress <= 0) switchToHero();
      }
+   }, { passive: false });
 
-     // 滚动指示器
-     if (scrollY > vh * 0.12) {
-       scrollIndicator.style.opacity = Math.max(0, 1 - (scrollY - vh * 0.12) / (vh * 0.18));
-     } else {
-       scrollIndicator.style.opacity = '1';
-     }
-   }
-
-   // requestAnimationFrame 节流
-   window.addEventListener('scroll', function() {
-     if (!ticking) {
-       requestAnimationFrame(function() {
-         handleVideoTransition();
-         ticking = false;
-       });
-       ticking = true;
-     }
+   // ===== 移动端 touch 劫持 =====
+   var touchStartY = 0;
+   window.addEventListener('touchstart', function(e) {
+     if (currentPhase === 'content') return;
+     touchStartY = e.touches[0].clientY;
    }, { passive: true });
 
-   // 页面加载：预加载 hero + 后台预加载其他
+   window.addEventListener('touchmove', function(e) {
+     if (currentPhase === 'content') return;
+     var deltaY = touchStartY - e.touches[0].clientY;
+     touchStartY = e.touches[0].clientY;
+     e.preventDefault();
+
+     if (window._autoScrollActive) {
+       window._userScrolled = true;
+       window._cancelAutoScroll();
+     }
+
+     if (currentPhase === 'hero' && deltaY > 0) {
+       switchToScrub();
+       scrubProgress = Math.min(0.05, Math.abs(deltaY) / SCRUB_SENSITIVITY);
+       if (transitionReady && transitionVideoEl && transitionVideoEl.duration) {
+         transitionVideoEl.currentTime = scrubProgress * transitionVideoEl.duration;
+       }
+       return;
+     }
+
+     if (currentPhase === 'scrub') {
+       scrubProgress += deltaY / SCRUB_SENSITIVITY;
+       scrubProgress = Math.max(0, Math.min(1, scrubProgress));
+
+       if (transitionReady && transitionVideoEl && transitionVideoEl.duration) {
+         var t = scrubProgress * transitionVideoEl.duration;
+         if (Math.abs(transitionVideoEl.currentTime - t) > 0.05) {
+           transitionVideoEl.currentTime = t;
+         }
+       }
+
+       if (scrubProgress > 0.85) {
+         updateLayerOpacities(0, 1, (scrubProgress - 0.85) / 0.15);
+       } else {
+         updateLayerOpacities(0, 1, 0);
+       }
+
+       if (scrubProgress >= 1) switchToContent();
+       if (scrubProgress <= 0) switchToHero();
+     }
+   }, { passive: false });
+
+   // ===== 暴露接口（供自动滚动 / 按钮使用） =====
+   window._videoTransition = {
+     getPhase: function() { return currentPhase; },
+     getProgress: function() { return scrubProgress; },
+     switchToScrub: switchToScrub,
+     switchToContent: switchToContent,
+     setProgress: function(p) {
+       if (currentPhase === 'content') return;
+       if (currentPhase === 'hero' && p > 0) switchToScrub();
+       if (currentPhase === 'scrub') {
+         scrubProgress = Math.max(0, Math.min(1, p));
+         if (transitionReady && transitionVideoEl && transitionVideoEl.duration) {
+           transitionVideoEl.currentTime = scrubProgress * transitionVideoEl.duration;
+         }
+         if (scrubProgress > 0.85) {
+           updateLayerOpacities(0, 1, (scrubProgress - 0.85) / 0.15);
+         } else {
+           updateLayerOpacities(0, 1, 0);
+         }
+         if (scrubProgress >= 1) switchToContent();
+         if (scrubProgress <= 0) switchToHero();
+       }
+     }
+   };
+
+   // 页面加载：锁定滚动 + 预加载视频
+   lockScroll();
+
    setTimeout(function() {
      if (heroVideo && heroVideo.paused) {
        heroVideo.muted = true;
@@ -3099,7 +3182,6 @@ const AudioManager = {
          v.muted = true;
          v.load();
        });
-       // 加载完元数据后设置起始位置
        if (transitionVideoEl) {
          transitionVideoEl.addEventListener('loadedmetadata', function() {
            transitionVideoEl.currentTime = 0;
@@ -3110,79 +3192,67 @@ const AudioManager = {
      }, 2000);
    }, 300);
 
-   // 页面加载时初始状态
+   // 初始状态
    updateLayerOpacities(1, 0, 0);
  })();
 
-   // ===== 自动滚动 =====
+   // ===== 自动滚动（使用视频进度推进） =====
    var autoScrollActive = false;
    var autoScrollTimer = null;
    var userScrolled = false;
 
+   // 暴露给视频过渡系统使用
+   window._autoScrollActive = false;
+   window._userScrolled = false;
+
    function cancelAutoScroll() {
      autoScrollActive = false;
+     window._autoScrollActive = false;
      clearTimeout(autoScrollTimer);
    }
+   window._cancelAutoScroll = cancelAutoScroll;
 
-   function smoothScrollTo(y, callback) {
-     // 使用原生 smooth scroll，监听结束
-     var startY = window.scrollY;
+   function animateProgressTo(target, duration, callback) {
+     var vt = window._videoTransition;
+     if (!vt) return;
+
+     var startProgress = vt.getProgress();
      var startTime = performance.now();
-     var duration = 1000; // 1s 平滑滚动
 
-     function scrollStep(now) {
+     function step(now) {
+       if (!autoScrollActive) return;
        var elapsed = now - startTime;
-       var progress = Math.min(elapsed / duration, 1);
+       var p = Math.min(1, elapsed / duration);
        // easeInOutCubic
-       var eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-       window.scrollTo(0, startY + (y - startY) * eased);
+       var eased = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+       vt.setProgress(startProgress + (target - startProgress) * eased);
 
-       if (progress < 1 && autoScrollActive) {
-         requestAnimationFrame(scrollStep);
-       } else if (callback && autoScrollActive) {
+       if (p < 1) {
+         requestAnimationFrame(step);
+       } else if (callback) {
          setTimeout(callback, 300);
        }
      }
 
-     requestAnimationFrame(scrollStep);
+     requestAnimationFrame(step);
    }
 
    function startAutoScroll() {
      if (autoScrollActive || userScrolled) return;
      autoScrollActive = true;
-     var vh = window.innerHeight;
+     window._autoScrollActive = true;
+     var vt = window._videoTransition;
 
-     // 阶段1：Hero 停留 2s → 滚动到 Transition
+     // Hero 停留 2s → 进入过渡视频并用 5s 推进到最后
      autoScrollTimer = setTimeout(function() {
        if (!autoScrollActive) return;
-       smoothScrollTo(vh, function() {
-         if (!autoScrollActive) return;
-         // 阶段2：Transition 停留 2s → 滚动到 Content
-         autoScrollTimer = setTimeout(function() {
-           if (!autoScrollActive) return;
-           smoothScrollTo(vh * 1.6, function() {
-             cancelAutoScroll();
-             console.log('✅ Auto-scroll tour completed');
-           });
-         }, 2000);
+       vt.switchToScrub();
+       animateProgressTo(1, 5000, function() {
+         cancelAutoScroll();
+         console.log('✅ Auto-scroll tour completed');
        });
      }, 2000);
    }
-
-   // 用户手动滚动则取消自动滚动
-   window.addEventListener('wheel', function() {
-     if (autoScrollActive) {
-       userScrolled = true;
-       cancelAutoScroll();
-     }
-   }, { passive: true, once: false });
-
-   window.addEventListener('touchmove', function() {
-     if (autoScrollActive) {
-       userScrolled = true;
-       cancelAutoScroll();
-     }
-   }, { passive: true, once: false });
 
    // 首次交互后启动自动滚动
    var autoScrollStarted = false;
@@ -3192,43 +3262,65 @@ const AudioManager = {
      setTimeout(startAutoScroll, 1500);
    }, { once: false });
 
-   // Get Started 按钮 → 直接滚动到 Transition
+   // Get Started 按钮 → 直接切换到过渡视频
    var btnStart = document.getElementById('btn-hero-start');
    if (btnStart) {
      btnStart.addEventListener('click', function(e) {
        e.stopPropagation();
        cancelAutoScroll();
        userScrolled = true;
+       window._userScrolled = true;
        autoScrollStarted = true;
-       preBuffer(transitionVideoEl);
-       smoothScrollTo(window.innerHeight);
+       var vt = window._videoTransition;
+       if (vt) {
+         vt.switchToScrub();
+         setTimeout(function() {
+           if (vt.getPhase() === 'scrub') {
+             autoScrollActive = true;
+             window._autoScrollActive = true;
+             animateProgressTo(1, 4000, function() {
+               cancelAutoScroll();
+             });
+           }
+         }, 300);
+       }
      });
    }
 
      // ===== 全局按钮交互逻辑 =====
      (function(){
-       // Hero "查看文档" → 滚动到 features
+       // Hero "查看文档" → 跳过过渡直接到 features
        var btnHeroDocs = document.getElementById('btn-hero-docs');
        if (btnHeroDocs) {
          btnHeroDocs.addEventListener('click', function(e){
            e.preventDefault();
            cancelAutoScroll();
            userScrolled = true;
+           window._userScrolled = true;
            autoScrollStarted = true;
-           var features = document.getElementById('features');
-           if (features) { features.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+           // 直接跳到内容阶段并解锁滚动
+           var vt = window._videoTransition;
+           if (vt && vt.getPhase() !== 'content') {
+             vt.switchToContent();
+           }
+           setTimeout(function() {
+             var features = document.getElementById('features');
+             if (features) { features.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+           }, 400);
          });
        }
 
-       // 滚动指示器点击 → 向下滚动
+       // 滚动指示器点击 → 进入过渡视频
        var scrollIndicator = document.getElementById('scroll-indicator');
        if (scrollIndicator) {
          scrollIndicator.style.cursor = 'pointer';
          scrollIndicator.addEventListener('click', function(){
            cancelAutoScroll();
            userScrolled = true;
+           window._userScrolled = true;
            autoScrollStarted = true;
-           smoothScrollTo(window.innerHeight);
+           var vt = window._videoTransition;
+           if (vt) vt.switchToScrub();
          });
        }
 
