@@ -303,13 +303,49 @@ app.get('/api/debug/pollution-source', async (req, res) => {
     } catch (e) { info[table] = { error: e.message }; }
   }
 
-  try {
-    const Pollution = require('./models/Pollution');
-    const aggregated = await Pollution.getAll();
-    info.aggregated = { count: aggregated.length, sources: aggregated.map(r => r.region) };
-  } catch (e) { info.aggregated = { error: e.message }; }
-
   res.json(info);
+});
+
+// CSV 数据导入端点：将本地 CSV 文件导入 TiDB Cloud
+app.post('/api/admin/import-all', async (req, res) => {
+  const { exec } = require('child_process');
+  const path = require('path');
+  const scriptsDir = path.join(__dirname, 'scripts');
+
+  const scripts = [
+    { name: '渤海水质数据', file: 'import_bohai.js' },
+    { name: '挪威有机污染物+微塑料', file: 'import_norway.js' },
+    { name: '全球微塑料', file: 'import_global_microplastics.js' }
+  ];
+
+  const results = [];
+
+  for (const script of scripts) {
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const scriptPath = path.join(scriptsDir, script.file);
+        console.log(`🚀 开始导入: ${script.name}`);
+        exec(`node "${scriptPath}"`, {
+          cwd: __dirname,
+          timeout: 300000, // 5分钟超时
+          maxBuffer: 10 * 1024 * 1024, // 10MB 输出缓冲
+          env: { ...process.env }
+        }, (error, stdout, stderr) => {
+          if (error) {
+            resolve({ script: script.name, success: false, error: error.message, stderr: stderr?.slice(-500), stdout: stdout?.slice(-500) });
+          } else {
+            resolve({ script: script.name, success: true, output: stdout?.slice(-1000) });
+          }
+        });
+      });
+      results.push(result);
+      console.log(`${result.success ? '✅' : '❌'} ${script.name}: ${result.success ? '成功' : result.error}`);
+    } catch (e) {
+      results.push({ script: script.name, success: false, error: e.message });
+    }
+  }
+
+  res.json({ message: '导入完成', results });
 });
 
 // ========== 历史数据查询 API ==========
