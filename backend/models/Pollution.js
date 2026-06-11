@@ -41,190 +41,12 @@ function formatRegion(r) {
   };
 }
 
-// ===== 从真实数据表动态聚合污染指数 =====
-async function aggregateFromRealTables() {
-  const regions = [];
-
-  // --- 渤海：从 bohai_raw 聚合 ---
-  try {
-    const [bohaiCount] = await db.query(`SELECT COUNT(*) AS cnt FROM bohai_raw`);
-    if (bohaiCount[0].cnt > 0) {
-      // 水质等级分布计算污染指数
-      const [qualityDist] = await db.query(
-        `SELECT quality_class, COUNT(*) AS cnt FROM bohai_raw GROUP BY quality_class`
-      );
-      const total = qualityDist.reduce((s, r) => s + r.cnt, 0);
-      const qMap = { '一类': 10, '二类': 30, '三类': 55, '四类': 75, '劣四类': 95 };
-      let weightedSum = 0;
-      qualityDist.forEach(r => {
-        weightedSum += (qMap[r.quality_class] || 50) * r.cnt;
-      });
-      const pollutionIndex = Math.round(weightedSum / total);
-
-      // 化学指标：综合 COD + 无机氮 + 活性磷酸盐 + 石油类
-      const [chemStats] = await db.query(
-        `SELECT AVG(cod) AS avg_cod, AVG(inorganic_nitrogen) AS avg_n,
-                AVG(active_phosphate) AS avg_p, AVG(petroleum) AS avg_oil
-         FROM bohai_raw`
-      );
-      // 标准化到 0-100: COD 标准 (≤2 一类, >5 劣四类), N (≤0.2 一类, >0.5 劣四类)
-      const codNorm = Math.min(100, (chemStats[0].avg_cod / 5) * 100);
-      const nNorm = Math.min(100, (chemStats[0].avg_n / 0.5) * 100);
-      const pNorm = Math.min(100, (chemStats[0].avg_p / 0.045) * 100);
-      const oilNorm = Math.min(100, (chemStats[0].avg_oil / 0.1) * 100);
-      const chemicalLevel = Math.round((codNorm * 0.3 + nNorm * 0.3 + pNorm * 0.2 + oilNorm * 0.2));
-
-      // 微塑料：渤海数据中没有直接测量，基于污染综合水平估算
-      const microplasticLevel = Math.round(pollutionIndex * 0.85);
-
-      // 经纬度取渤海中心
-      const [center] = await db.query(
-        `SELECT AVG(lat) AS lat, AVG(lon) AS lng FROM bohai_raw`
-      );
-
-      regions.push({
-        region: '渤海',
-        pollutionIndex,
-        microplasticLevel,
-        chemicalLevel,
-        lat: parseFloat(center[0].lat.toFixed(8)),
-        lng: parseFloat(center[0].lng.toFixed(8)),
-        zoom: 7,
-        affectedSpecies: ['斑海豹', '中国对虾', '小黄鱼'],
-        updatedAt: new Date().toISOString().split('T')[0]
-      });
-      console.log(`[Pollution] 渤海聚合: ${bohaiCount[0].cnt}条 → PI=${pollutionIndex}, ML=${microplasticLevel}, CL=${chemicalLevel}`);
-    }
-  } catch (e) {
-    console.warn(`[Pollution] 渤海聚合失败: ${e.message}`);
-  }
-
-  // --- 挪威海峡：从 norway_organic + norway_microplastic 聚合 ---
-  try {
-    const [orgCount] = await db.query(`SELECT COUNT(*) AS cnt FROM norway_organic`);
-    const [mpCount] = await db.query(`SELECT COUNT(*) AS cnt FROM norway_microplastic`);
-    if (orgCount[0].cnt > 0) {
-      // 有机污染物综合指数：基于 THC, BaP, PCB, PFOS
-      const [orgStats] = await db.query(
-        `SELECT AVG(thc) AS avg_thc, AVG(benzoa_pyrene) AS avg_bap,
-                AVG(pcb_153) AS avg_pcb, AVG(pfos) AS avg_pfos
-         FROM norway_organic WHERE thc IS NOT NULL`
-      );
-      // THC: >100 高污染, BaP: >5 高污染
-      const thcNorm = Math.min(100, (orgStats[0].avg_thc / 100) * 100);
-      const bapNorm = Math.min(100, (orgStats[0].avg_bap / 5) * 100);
-      const pcbNorm = Math.min(100, (orgStats[0].avg_pcb / 3) * 100);
-      const pfosNorm = Math.min(100, (orgStats[0].avg_pfos / 2) * 100);
-      const chemicalLevel = Math.round((thcNorm * 0.35 + bapNorm * 0.25 + pcbNorm * 0.2 + pfosNorm * 0.2));
-
-      // 微塑料水平
-      let microplasticLevel = 40; // 默认
-      try {
-        const [mpStats] = await db.query(
-          `SELECT AVG(microplastic_concentration) AS avg_conc, MAX(microplastic_concentration) AS max_conc
-           FROM norway_microplastic WHERE microplastic_concentration IS NOT NULL`
-        );
-        if (mpStats[0].avg_conc !== null) {
-          microplasticLevel = Math.round(Math.min(100, (mpStats[0].avg_conc / 5) * 100));
-        }
-      } catch (_) {}
-
-      // 综合污染指数
-      const pollutionIndex = Math.round((chemicalLevel * 0.55 + microplasticLevel * 0.45));
-
-      const [center] = await db.query(
-        `SELECT AVG(lat) AS lat, AVG(lon) AS lng FROM norway_organic WHERE lat IS NOT NULL`
-      );
-
-      regions.push({
-        region: '挪威海峡',
-        pollutionIndex,
-        microplasticLevel,
-        chemicalLevel,
-        lat: parseFloat(center[0].lat.toFixed(8)),
-        lng: parseFloat(center[0].lng.toFixed(8)),
-        zoom: 5,
-        affectedSpecies: ['虎鲸', '大西洋鲑', '北极鳕'],
-        updatedAt: new Date().toISOString().split('T')[0]
-      });
-      console.log(`[Pollution] 挪威聚合: 有机${orgCount[0].cnt}条+微塑料${mpCount[0].cnt}条 → PI=${pollutionIndex}, ML=${microplasticLevel}, CL=${chemicalLevel}`);
-    }
-  } catch (e) {
-    console.warn(`[Pollution] 挪威聚合失败: ${e.message}`);
-  }
-
-  // --- 全球海域：从 global_microplastics 聚合 ---
-  try {
-    const [mpCount] = await db.query(`SELECT COUNT(*) AS cnt FROM global_microplastics`);
-    if (mpCount[0].cnt > 0) {
-      const [oceans] = await db.query(
-        `SELECT ocean, COUNT(*) AS cnt,
-                ROUND(AVG(measurement), 4) AS avg_conc,
-                ROUND(SUM(CASE WHEN conc_class IN ('High','Very High') THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS high_pct
-         FROM global_microplastics
-         WHERE ocean IS NOT NULL AND ocean != '' AND measurement IS NOT NULL
-         GROUP BY ocean HAVING cnt > 100
-         ORDER BY cnt DESC LIMIT 6`
-      );
-
-      // 海域映射：经纬度中心点 + 受影响物种
-      const oceanMeta = {
-        'North Pacific': { lat: 30, lng: -160, zoom: 3, species: ['太平洋鲑', '海龟', '信天翁'] },
-        'North Atlantic': { lat: 35, lng: -40, zoom: 3, species: ['北大西洋露脊鲸', '鳕鱼', '海雀'] },
-        'Mediterranean Sea': { lat: 37, lng: 15, zoom: 4, species: ['僧海豹', '蓝鳍金枪鱼', '海龟'] },
-        'South Pacific': { lat: -25, lng: -140, zoom: 3, species: ['小须鲸', '金枪鱼', '珊瑚'] },
-        'Indian Ocean': { lat: -15, lng: 70, zoom: 3, species: ['鲸鲨', '黄鳍金枪鱼', '海龟'] },
-        'South Atlantic': { lat: -30, lng: -20, zoom: 3, species: ['座头鲸', '鱿鱼', '海豹'] },
-        'Arctic Ocean': { lat: 78, lng: 0, zoom: 3, species: ['北极熊', '环斑海豹', '北极鳕'] },
-        'Southern Ocean': { lat: -65, lng: -60, zoom: 3, species: ['帝企鹅', '磷虾', '威德尔海豹'] }
-      };
-
-      for (const o of oceans) {
-        const meta = oceanMeta[o.ocean] || { lat: 0, lng: 0, zoom: 2, species: ['多种海洋生物'] };
-        // 基于微塑料浓度和 High/Very High 占比计算指数
-        const concNorm = Math.min(100, (o.avg_conc / 10) * 100);
-        const highNorm = o.high_pct * 1.2;
-        const pollutionIndex = Math.round((concNorm * 0.5 + highNorm * 0.5));
-        const microplasticLevel = Math.round(concNorm);
-        const chemicalLevel = Math.round(pollutionIndex * 0.7); // 化学水平估算
-
-        regions.push({
-          region: o.ocean,
-          pollutionIndex: Math.max(20, Math.min(95, pollutionIndex)),
-          microplasticLevel: Math.max(15, Math.min(95, microplasticLevel)),
-          chemicalLevel: Math.max(15, Math.min(90, chemicalLevel)),
-          lat: meta.lat,
-          lng: meta.lng,
-          zoom: meta.zoom,
-          affectedSpecies: meta.species,
-          updatedAt: new Date().toISOString().split('T')[0]
-        });
-      }
-      console.log(`[Pollution] 全球微塑料聚合: ${mpCount[0].cnt}条 → ${oceans.length}个海域`);
-    }
-  } catch (e) {
-    console.warn(`[Pollution] 全球微塑料聚合失败: ${e.message}`);
-  }
-
-  return regions;
-}
-
 class Pollution {
   static async getAll() {
     return safeQuery(mockRegions.map(formatRegion), async () => {
-      // 优先从真实数据表聚合
-      try {
-        const aggregated = await aggregateFromRealTables();
-        if (aggregated.length > 0) {
-          return aggregated;
-        }
-      } catch (e) {
-        console.warn(`[Pollution] 真实数据聚合失败，回退到 pollution_data 表: ${e.message}`);
-      }
-
-      // 回退到 pollution_data 表
       const sql = `SELECT region, pollution_index as pollutionIndex, microplastic_level as microplasticLevel, chemical_level as chemicalLevel, lat, lng, zoom, affected_species as affectedSpecies, updated_at as updatedAt FROM pollution_data ORDER BY pollution_index DESC`;
       const [rows] = await db.query(sql);
+      if (rows.length === 0) return mockRegions.map(formatRegion);
       return rows.map(row => ({
         ...row,
         affectedSpecies: typeof row.affectedSpecies === 'string' ? JSON.parse(row.affectedSpecies) : row.affectedSpecies,
@@ -248,27 +70,14 @@ class Pollution {
 
   static async getStats() {
     return safeQuery({
-      avgPollution: 62.5,
+      avgPollution: 68.5,
       maxPollution: 92,
-      minPollution: 38,
-      totalRegions: 8
+      minPollution: 45,
+      totalRegions: 14
     }, async () => {
-      // 优先从真实数据聚合获取
-      try {
-        const all = await aggregateFromRealTables();
-        if (all.length > 0) {
-          const indices = all.map(r => r.pollutionIndex);
-          return {
-            avgPollution: Math.round(indices.reduce((a, b) => a + b, 0) / indices.length),
-            maxPollution: Math.max(...indices),
-            minPollution: Math.min(...indices),
-            totalRegions: all.length
-          };
-        }
-      } catch (_) {}
-      // 回退
       const sql = `SELECT AVG(pollution_index) as avgPollution, MAX(pollution_index) as maxPollution, MIN(pollution_index) as minPollution, COUNT(*) as totalRegions FROM pollution_data`;
       const [rows] = await db.query(sql);
+      if (rows[0].totalRegions === 0) return { avgPollution: 68.5, maxPollution: 92, minPollution: 45, totalRegions: 14 };
       return rows[0];
     });
   }
