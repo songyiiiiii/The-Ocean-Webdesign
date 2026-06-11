@@ -4,7 +4,7 @@ services:
     runtime: node
     rootDir: backend
     plan: free
-    buildCommand: npm install && echo "Build complete"
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV

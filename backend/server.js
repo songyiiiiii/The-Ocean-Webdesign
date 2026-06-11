@@ -277,6 +277,7 @@ app.get('/api/health', async (req, res) => {
   res.json({
     status: 'OK',
     message: '海洋保护API运行正常',
+    version: '2.0.0',
     database: dbStatus,
     dbCode: dbCode,
     tcpToDb: tcpStatus,
