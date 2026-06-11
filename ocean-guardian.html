@@ -2933,7 +2933,7 @@ const AudioManager = {
        }
      }
 
-    // ===== 视频过渡系统 v2（直接交叉淡入淡出，无黑幕卡顿） =====
+    // ===== 视频过渡系统 v3（滚动控制 transition 视频进度，交叉淡入淡出） =====
  (function(){
    const heroContainer = document.getElementById('hero-video-container');
    const heroOverlay = document.querySelector('.hero-video-overlay');
@@ -2944,104 +2944,134 @@ const AudioManager = {
    const transitionSection = document.getElementById('transition-video-section');
    const transitionVideoEl = document.getElementById('transition-video');
 
-   // CSS 过渡统一由样式表控制（0.8s），这里不再创建黑幕层
+   // 给容器加 CSS transition 用于交叉淡入淡出
+   [heroContainer, transitionSection, globalVideoContainer].forEach(function(el) {
+     if (el) el.style.transition = 'opacity 0.6s ease';
+   });
 
-   let currentZone = 'hero';
-   let pendingZone = null;
-   let transitionTimeout = null;
-   let debounceTimer = null;
+   let currentPhase = 'hero';       // 'hero' | 'scrub' | 'content'
    let ticking = false;
+   let transitionReady = false;     // transition 视频是否已加载完元数据
+   let scrubProgress = 0;           // 0~1, video playback progress
 
-   // 预缓冲视频
+   // 等 transition 视频元数据加载完
+   if (transitionVideoEl) {
+     transitionVideoEl.addEventListener('loadedmetadata', function() {
+       transitionReady = true;
+       transitionVideoEl.currentTime = 0;
+       transitionVideoEl.pause();
+     });
+     // 如果已经加载完了
+     if (transitionVideoEl.readyState >= 1) transitionReady = true;
+   }
+
    function preBuffer(video) {
      if (!video || !video.paused) return;
      video.muted = true;
      video.play().catch(function(){});
    }
 
-   // 执行区域切换（直接交叉淡入淡出）
-   function switchZone(toZone) {
-     if (toZone === currentZone && pendingZone === null) return;
-
-     clearTimeout(transitionTimeout);
-
-     switch (toZone) {
-       case 'hero':
-         preBuffer(heroVideo);
-         heroContainer.style.opacity = '1';
-         if (transitionSection) transitionSection.style.opacity = '0';
-         globalVideoContainer.style.opacity = '0';
-         AudioManager.setAudio(heroVideo, 'hero');
-         break;
-       case 'transition':
-         preBuffer(transitionVideoEl);
-         heroContainer.style.opacity = '0';
-         if (transitionSection) {
-           transitionSection.style.opacity = '1';
-           transitionSection.style.pointerEvents = 'none';
-         }
-         globalVideoContainer.style.opacity = '0';
-         AudioManager.setAudio(transitionVideoEl, 'transition');
-         break;
-       case 'content':
-         preBuffer(globalVideo);
-         heroContainer.style.opacity = '0';
-         if (transitionSection) transitionSection.style.opacity = '0';
-         globalVideoContainer.style.opacity = '1';
-         AudioManager.setAudio(globalVideo, 'global');
-         break;
+   // 更新视频层的 opacity（交叉淡入淡出）
+   function updateLayerOpacities(heroO, transO, bgO) {
+     if (heroContainer) heroContainer.style.opacity = String(heroO);
+     if (transitionSection) {
+       transitionSection.style.opacity = String(transO);
+       transitionSection.style.pointerEvents = transO > 0.05 ? 'none' : 'none';
      }
-
-     currentZone = toZone;
-     pendingZone = null;
-
-     // 800ms 后允许下一次切换（匹配 CSS transition 时长）
-     transitionTimeout = setTimeout(function() {
-       transitionTimeout = null;
-       if (pendingZone && pendingZone !== currentZone) {
-         switchZone(pendingZone);
-       }
-     }, 800);
+     if (globalVideoContainer) globalVideoContainer.style.opacity = String(bgO);
    }
 
    function handleVideoTransition() {
      var scrollY = window.scrollY;
-     var heroHeight = window.innerHeight;
+     var vh = window.innerHeight;
+     var maxScroll = document.body.scrollHeight - vh;
 
-     // 区域判定（带滞后区间，防止边界来回跳）
-     var desiredZone;
-     if (scrollY < heroHeight * 0.85) {
-       desiredZone = 'hero';
-     } else if (scrollY < heroHeight * 1.25) {
-       desiredZone = 'transition';
-     } else {
-       desiredZone = 'content';
+     // 区域定义
+     var heroEnd = vh * 0.75;                          // hero 结束，开始 scrubbing
+     var scrubTotal = vh * 2.0;                         // scrubbing 需要的滚动距离
+     var scrubEnd = heroEnd + scrubTotal;               // scrubbing 结束，进入 content
+
+     // 防止 scrubEnd 超出最大滚动距离
+     if (scrubEnd > maxScroll * 0.85) {
+       scrubEnd = maxScroll * 0.85;
+       if (scrubEnd < heroEnd + 100) scrubEnd = heroEnd + 100;
      }
+     var scrubRange = scrubEnd - heroEnd;
 
-     if (desiredZone !== currentZone) {
-       if (transitionTimeout) {
-         // 正在过渡中，记录最新目标
-         pendingZone = desiredZone;
-       } else {
-         // 防抖：200ms 内不变才触发
-         clearTimeout(debounceTimer);
-         debounceTimer = setTimeout(function() {
-           if (desiredZone !== currentZone) {
-             switchZone(desiredZone);
-           }
-         }, 200);
+     // 归一化 scrub 进度 0~1
+     var rawProgress = (scrollY - heroEnd) / scrubRange;
+     rawProgress = Math.max(0, Math.min(1, rawProgress));
+
+     // --- Phase 判断 ---
+     if (scrollY < heroEnd) {
+       // === HERO ===
+       if (currentPhase !== 'hero') {
+         preBuffer(heroVideo);
+         updateLayerOpacities(1, 0, 0);
+         AudioManager.setAudio(heroVideo, 'hero');
+         currentPhase = 'hero';
+       }
+       // hero overlay 跟随滚动加深
+       if (heroOverlay) {
+         var p = Math.min(1, scrollY / (heroEnd * 0.9));
+         heroOverlay.style.background = 'radial-gradient(ellipse at 30% 80%, rgba(2,10,20,' + (0.03 + p * 0.12).toFixed(3) + ') 0%, rgba(2,10,20,' + (0.08 + p * 0.32).toFixed(3) + ') 50%, rgba(2,10,20,' + (0.15 + p * 0.50).toFixed(3) + ') 100%)';
+       }
+
+     } else if (scrollY < scrubEnd) {
+       // === SCRUB (scroll controls ocean-tran.mp4) ===
+       if (currentPhase !== 'scrub') {
+         // 进入 scrub：暂停 hero，交接到 transition
+         if (transitionReady && transitionVideoEl) {
+           transitionVideoEl.currentTime = 0;
+           transitionVideoEl.pause();
+           transitionVideoEl.muted = true;
+         }
+         AudioManager.setAudio(transitionVideoEl, 'transition');
+         currentPhase = 'scrub';
+       }
+
+       // 根据滚动位置 scrub transition 视频
+       if (transitionReady && transitionVideoEl && transitionVideoEl.duration) {
+         var targetTime = rawProgress * transitionVideoEl.duration;
+         // 避免频繁 seek 造成闪烁：时间差 > 0.05s 才更新
+         if (Math.abs(transitionVideoEl.currentTime - targetTime) > 0.06) {
+           transitionVideoEl.currentTime = targetTime;
+         }
+       }
+
+       scrubProgress = rawProgress;
+
+       // 交叉淡入淡出：接近 scrub 开始/结束时做渐变
+       var fadeIn = Math.min(1, rawProgress * 4);        // 前 25% 的 scrubbing 内淡入
+       var fadeOut = rawProgress > 0.85 ? Math.min(1, (1 - rawProgress) / 0.15) : 1;  // 后 15% 开始淡出
+       var transOpacity = Math.min(fadeIn, fadeOut);
+       var heroOpacity = 1 - fadeIn;
+
+       // bg 在 scrubbing 最后 15% 开始淡入
+       var bgFadeIn = rawProgress > 0.85 ? (rawProgress - 0.85) / 0.15 : 0;
+       updateLayerOpacities(heroOpacity, transOpacity, bgFadeIn);
+
+       // hero overlay 持续加深
+       if (heroOverlay) {
+         heroOverlay.style.background = 'radial-gradient(ellipse at 30% 80%, rgba(2,10,20,0.15) 0%, rgba(2,10,20,0.40) 50%, rgba(2,10,20,0.65) 100%)';
+       }
+
+     } else {
+       // === CONTENT (ocean-bg.mp4 autoplay) ===
+       if (currentPhase !== 'content') {
+         preBuffer(globalVideo);
+         updateLayerOpacities(0, 0, 1);
+         AudioManager.setAudio(globalVideo, 'global');
+         currentPhase = 'content';
+       }
+       if (heroOverlay) {
+         heroOverlay.style.background = 'radial-gradient(ellipse at 30% 80%, rgba(2,10,20,0.18) 0%, rgba(2,10,20,0.45) 50%, rgba(2,10,20,0.75) 100%)';
        }
      }
 
-     // Hero 遮罩渐变（滚动时逐渐加深）
-     if (scrollY <= heroHeight && heroOverlay) {
-       var p = Math.min(1, scrollY / (heroHeight * 0.7));
-       heroOverlay.style.background = 'radial-gradient(ellipse at 30% 80%, rgba(2,10,20,' + (0.03 + p * 0.15).toFixed(3) + ') 0%, rgba(2,10,20,' + (0.08 + p * 0.35).toFixed(3) + ') 50%, rgba(2,10,20,' + (0.15 + p * 0.55).toFixed(3) + ') 100%)';
-     }
-
-     // 滚动指示器淡出
-     if (scrollY > heroHeight * 0.15) {
-       scrollIndicator.style.opacity = Math.max(0, 1 - (scrollY - heroHeight * 0.15) / (heroHeight * 0.2));
+     // 滚动指示器
+     if (scrollY > vh * 0.12) {
+       scrollIndicator.style.opacity = Math.max(0, 1 - (scrollY - vh * 0.12) / (vh * 0.18));
      } else {
        scrollIndicator.style.opacity = '1';
      }
@@ -3058,22 +3088,31 @@ const AudioManager = {
      }
    }, { passive: true });
 
-   // 延迟确保 hero 视频播放，并后台预加载其他视频
+   // 页面加载：预加载 hero + 后台预加载其他
    setTimeout(function() {
      if (heroVideo && heroVideo.paused) {
        heroVideo.muted = true;
        heroVideo.play().catch(function(){});
-       console.log('📹 Hero video started');
      }
-     // 2秒后后台悄悄预加载背景视频（不播放，只下载）
      setTimeout(function() {
        [globalVideo, transitionVideoEl].filter(Boolean).forEach(function(v) {
          v.muted = true;
          v.load();
        });
-       console.log('📥 Background videos preloaded');
+       // 加载完元数据后设置起始位置
+       if (transitionVideoEl) {
+         transitionVideoEl.addEventListener('loadedmetadata', function() {
+           transitionVideoEl.currentTime = 0;
+           transitionVideoEl.pause();
+           transitionReady = true;
+         }, { once: true });
+       }
      }, 2000);
    }, 300);
+
+   // 页面加载时初始状态
+   updateLayerOpacities(1, 0, 0);
+ })();
 
    // ===== 自动滚动 =====
    var autoScrollActive = false;
