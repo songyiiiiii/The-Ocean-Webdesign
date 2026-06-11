@@ -191,11 +191,14 @@ async function main() {
   console.log(`数据库: ${process.env.DB_NAME}`);
   console.log(`主机: ${process.env.DB_HOST}\n`);
 
+  const dbSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
   const conn = await mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'ocean_protection'
+    database: process.env.DB_NAME || 'ocean_protection',
+    ssl: dbSsl ? { rejectUnauthorized: false } : undefined
   });
 
   try {

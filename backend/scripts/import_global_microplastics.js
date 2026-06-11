@@ -46,11 +46,14 @@ async function main() {
 
   console.log(`   记录数: ${records.length}\n`);
 
+  const dbSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
   const conn = await mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'ocean_protection'
+    database: process.env.DB_NAME || 'ocean_protection',
+    ssl: dbSsl ? { rejectUnauthorized: false } : undefined
   });
 
   await conn.query(`DROP TABLE IF EXISTS global_microplastics`);
