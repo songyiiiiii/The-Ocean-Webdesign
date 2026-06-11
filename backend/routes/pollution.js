@@ -82,13 +82,11 @@ async function aggregateFromRealTables() {
       );
 
       const metaMap = {
-        'North Pacific': { lat: 30, lng: -160, zoom: 3, sp: ['太平洋鲑', '海龟', '信天翁'] },
-        'North Atlantic': { lat: 35, lng: -40, zoom: 3, sp: ['北大西洋露脊鲸', '鳕鱼', '海雀'] },
-        'Mediterranean Sea': { lat: 37, lng: 15, zoom: 4, sp: ['僧海豹', '蓝鳍金枪鱼', '海龟'] },
-        'South Pacific': { lat: -25, lng: -140, zoom: 3, sp: ['小须鲸', '金枪鱼', '珊瑚'] },
+        'Atlantic Ocean': { lat: 0, lng: -25, zoom: 2, sp: ['座头鲸', '海龟', '北大西洋露脊鲸'] },
+        'Pacific Ocean': { lat: 0, lng: -150, zoom: 2, sp: ['太平洋鲑', '海龟', '信天翁'] },
         'Indian Ocean': { lat: -15, lng: 70, zoom: 3, sp: ['鲸鲨', '黄鳍金枪鱼', '海龟'] },
-        'South Atlantic': { lat: -30, lng: -20, zoom: 3, sp: ['座头鲸', '鱿鱼', '海豹'] },
         'Arctic Ocean': { lat: 78, lng: 0, zoom: 3, sp: ['北极熊', '环斑海豹', '北极鳕'] },
+        'Mediterranean Sea': { lat: 37, lng: 15, zoom: 4, sp: ['僧海豹', '蓝鳍金枪鱼', '海龟'] },
         'Southern Ocean': { lat: -65, lng: -60, zoom: 3, sp: ['帝企鹅', '磷虾', '威德尔海豹'] }
       };
 
