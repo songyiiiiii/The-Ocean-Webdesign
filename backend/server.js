@@ -277,9 +277,10 @@ app.get('/api/health', async (req, res) => {
   res.json({
     status: 'OK',
     message: '海洋保护API运行正常',
-    version: '2.0.0',
+    version: '2.0.1',
     database: dbStatus,
     dbCode: dbCode,
+    dbName: process.env.DB_NAME || 'ocean_protection',
     tcpToDb: tcpStatus,
     dbTarget: `${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306}`,
     websocket: true
@@ -290,37 +291,23 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/debug/pollution-source', async (req, res) => {
   const info = {};
   try {
-    // 测试 bohai_raw 表
-    const [bCnt] = await db.query('SELECT COUNT(*) AS cnt FROM bohai_raw');
-    info.bohai_raw = { count: bCnt[0].cnt };
-  } catch (e) { info.bohai_raw = { error: e.message }; }
+    const [dbName] = await db.query('SELECT DATABASE() AS db');
+    info.current_db = dbName[0].db;
+  } catch (e) { info.current_db = 'error: ' + e.message; }
 
-  try {
-    const [nCnt] = await db.query('SELECT COUNT(*) AS cnt FROM norway_organic');
-    info.norway_organic = { count: nCnt[0].cnt };
-  } catch (e) { info.norway_organic = { error: e.message }; }
+  const tables = ['bohai_raw', 'norway_organic', 'norway_microplastic', 'global_microplastics', 'pollution_data'];
+  for (const table of tables) {
+    try {
+      const [cnt] = await db.query(`SELECT COUNT(*) AS cnt FROM ${table}`);
+      info[table] = { count: cnt[0].cnt };
+    } catch (e) { info[table] = { error: e.message }; }
+  }
 
-  try {
-    const [mCnt] = await db.query('SELECT COUNT(*) AS cnt FROM norway_microplastic');
-    info.norway_microplastic = { count: mCnt[0].cnt };
-  } catch (e) { info.norway_microplastic = { error: e.message }; }
-
-  try {
-    const [gCnt] = await db.query('SELECT COUNT(*) AS cnt FROM global_microplastics');
-    info.global_microplastics = { count: gCnt[0].cnt };
-  } catch (e) { info.global_microplastics = { error: e.message }; }
-
-  try {
-    const [pCnt] = await db.query('SELECT COUNT(*) AS cnt FROM pollution_data');
-    info.pollution_data = { count: pCnt[0].cnt };
-  } catch (e) { info.pollution_data = { error: e.message }; }
-
-  // 测试聚合
   try {
     const Pollution = require('./models/Pollution');
     const aggregated = await Pollution.getAll();
     info.aggregated = { count: aggregated.length, sources: aggregated.map(r => r.region) };
-  } catch (e) { info.aggregated = { error: e.message, stack: e.stack }; }
+  } catch (e) { info.aggregated = { error: e.message }; }
 
   res.json(info);
 });
